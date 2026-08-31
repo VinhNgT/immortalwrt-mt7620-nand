@@ -48,6 +48,24 @@ ifneq ($(CONFIG_USE_APK),)
   ifeq ($(CONFIG_IB_STANDALONE),)
 	$(call FeedSourcesAppendAPK,$(PKG_BUILD_DIR)/repositories)
 	$(VERSION_SED_SCRIPT) $(PKG_BUILD_DIR)/repositories
+  else
+	# A standalone ImageBuilder bundles every package built with the
+	# firmware, but plain userland packages that were not built are
+	# otherwise uninstallable. List the remote userland feeds so apk can
+	# still fetch those; deliberately omit the per-target feed and the
+	# kmods feed - their kernel-dependent packages come from a foreign
+	# kernel build and must only ever resolve from the local packages/.
+	( \
+		echo '## Remote userland feeds. Kernel packages (kmod-*) are'; \
+		echo '## deliberately not listed: they resolve from the bundled'; \
+		echo '## packages/ directory, which matches this exact kernel.'; \
+		$(strip $(if $(CONFIG_PER_FEED_REPO), \
+			echo '%U/packages/%A/base/packages.adb'; \
+			$(foreach feed,$(FEEDS_AVAILABLE), \
+				$(if $(CONFIG_FEED_$(feed)), \
+					echo '$(if $(filter m,$(CONFIG_FEED_$(feed))),# )%U/packages/%A/$(feed)/packages.adb';)))) \
+	) >> $(PKG_BUILD_DIR)/repositories
+	$(VERSION_SED_SCRIPT) $(PKG_BUILD_DIR)/repositories
   endif
 
 	$(INSTALL_DATA) ./files/README.apk.md $(PKG_BUILD_DIR)/packages/README.md
