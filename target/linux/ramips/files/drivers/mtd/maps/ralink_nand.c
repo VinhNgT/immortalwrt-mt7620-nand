@@ -648,6 +648,11 @@ static int nfc_write_oob(struct ra_nand_chip *ra, int page, unsigned int offs, c
 int nfc_read_page(struct ra_nand_chip *ra, char *buf, int page, int flags);
 int nfc_write_page(struct ra_nand_chip *ra, char *buf, int page, int flags);
 
+/* bits corrected during the current mtd read op; reported to mtd core so
+ * UBI scrubs (rewrites) pages that develop retention bitflips instead of
+ * re-correcting them on every read forever. Serialized by nand_get_device. */
+static int ranfc_ecc_corrected;
+
 
 #if !defined (WORKAROUND_RX_BUF_OV)
 static int one_bit_correction(char *ecc, char *expected, int *bytes, int *bits);
@@ -781,6 +786,7 @@ ecc_check:
 				{
 					pBuf[bytes] = pBuf[bytes] ^ (1 << bits);
 					printk("1. correct byte %d, bit %d!\n", bytes, bits);
+					ranfc_ecc_corrected++;
 				}
 				else
 				{
@@ -798,6 +804,7 @@ ecc_check:
 				{
 					pBuf[bytes] = pBuf[bytes] ^ (1 << bits);
 					printk("2. correct byte %d, bit %d!\n", bytes, bits);
+					ranfc_ecc_corrected++;
 				}
 				else
 				{
@@ -814,6 +821,7 @@ ecc_check:
 				{
 					pBuf[bytes] = pBuf[bytes] ^ (1 << bits);
 					printk("3. correct byte %d, bit %d!\n", bytes, bits);
+					ranfc_ecc_corrected++;
 				}
 				else
 				{
@@ -830,6 +838,7 @@ ecc_check:
 				{
 					pBuf[bytes] = pBuf[bytes] ^ (1 << bits);
 					printk("4. correct byte %d, bit %d!\n", bytes, bits);
+					ranfc_ecc_corrected++;
 				}
 				else
 				{
@@ -1635,6 +1644,7 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 
 	ops->retlen = 0;
 	ops->oobretlen = 0;
+	ranfc_ecc_corrected = 0;
 	if (data == 0)
 		datalen = 0;
 
@@ -1705,6 +1715,15 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 		ra_nand_bbt_set(ra, addr >> ra->erase_shift, BBT_TAG_GOOD);
 		// address go further to next page, instead of increasing of length of write. This avoids some special cases wrong.
 		addr = (page+1) << ra->page_shift;
+	}
+
+	if (ranfc_ecc_corrected) {
+		if (ranfc_mtd)
+			ranfc_mtd->ecc_stats.corrected += ranfc_ecc_corrected;
+		/* max bitflips per ECC step: SW Hamming corrects at most 1, and a
+		 * corrected step is at its limit -> mtd core returns -EUCLEAN and
+		 * UBI scrubs the PEB */
+		return 1;
 	}
 	return 0;
 }
@@ -2046,7 +2065,9 @@ mtk_nand_probe(struct platform_device *pdev)
 	ranfc_mtd->_block_isbad		= ramtd_nand_block_isbad;
 	ranfc_mtd->_block_markbad	= ramtd_nand_block_markbad;
 	//ranfc_mtd->reboot_notifier
-	//ranfc_mtd->ecc_stats;
+	ranfc_mtd->ecc_step_size = 512;
+	ranfc_mtd->ecc_strength = 1;      /* SW Hamming: 1 bit per 512B step */
+	ranfc_mtd->bitflip_threshold = 1; /* any corrected flip -> -EUCLEAN */
 	// subpage_sht;
 
 	//ranfc_mtd->get_device; ranfc_mtd->put_device
