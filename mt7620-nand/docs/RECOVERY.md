@@ -1,30 +1,32 @@
 # Mi Router 3 — recovery runbook
 
 Backup, serial console, and every path back from a bad flash on a
-Xiaomi Mi Router 3 (R3) running this port. Normal installation and
-upgrades are in [GUIDE.md](GUIDE.md); this file is for prevention and
-repair. Everything here was established by direct on-device
-inspection and live serial sessions on a real unit (2026-08-30/31),
-not from wikis — where behavior could plausibly vary between units,
-that is noted. (Owner's device-specific data — serial number, backup
-checksums, local paths — lives in `PRIVATE-NOTES.md` in the `mt7620-nand/`
-folder, which is git-ignored and never published.)
+Xiaomi Mi Router 3 (R3) running this project's firmware. Normal
+installation and upgrades are in [GUIDE.md](GUIDE.md); this file is
+for prevention and repair. Everything here was established by direct
+on-device inspection and live serial sessions on one real unit on
+2026-08-30 and 2026-08-31 ("the tested unit" below), not from wikis —
+where behavior could plausibly vary between units, that is noted.
+(The maintainer's device-specific data — serial number, backup
+checksums, local paths — is kept in a git-ignored file,
+`mt7620-nand/PRIVATE-NOTES.md`, and is not published.)
 
 ## Standing facts
 
 - Bootloader (mtd0): **stock Ralink U-Boot 1.1.3** (2016 build),
   uImage-wrapped. This runbook never modifies it.
-- The tested unit's U-Boot env is already ideal for recovery work:
+- The tested unit's U-Boot env, as found, suited recovery work:
   `uart_en=1`, `boot_wait=on`, `bootdelay=5`, `ipaddr=192.168.1.1`,
   `serverip=192.168.1.3`, and `flag_boot_rootfs=1` → boots the
   `kernel` slot (mtd8). Inspect yours with `fw_printenv` before
   relying on it.
 - mtd0 is read-only under Linux (DTS `read-only`) — by design; keep
   it that way.
-- Kernel slots: mtd7 `kernel_stock` typically still holds the stock
-  2.6.36 kernel — CRC-valid but its rootfs is long gone, so it is
-  **not a fallback**. mtd8 `kernel` is the live slot under stock
-  U-Boot.
+- Kernel slots: on a unit converted from Xiaomi's firmware, mtd7
+  `kernel_stock` typically holds Xiaomi's original 2.6.36 kernel —
+  CRC-valid but its root filesystem was overwritten by the
+  conversion, so it is **not a fallback**. mtd8 `kernel` is the live
+  slot under stock U-Boot.
 - The stock bootloader has **no USB and no web recovery**. Serial is
   the backstop (any 3.3 V USB-TTL adapter, 115200 8N1).
 - NAND: ESMT F59L1G81LA (128 MiB). Single-bit retention flips
@@ -85,13 +87,13 @@ Any failure state short of a destroyed bootloader is recoverable:
    initramfs image (below) → repair from Linux: `mtd write` the
    relevant partitions from the backup, or run sysupgrade from the
    RAM-booted system.
-3. **Byte-exact return to the pre-port state** → RAM-boot any
-   initramfs, copy the backed-up `mtd8.bin` + `mtd9.bin` over (USB
-   stick or scp), then
+3. **Byte-exact return to whatever was backed up** (the firmware
+   installed before this project's) → RAM-boot any initramfs, copy
+   the backed-up `mtd8.bin` + `mtd9.bin` over (USB stick or scp), then
    `mtd write mtd8.bin kernel && mtd write mtd9.bin ubi`.
    (`factory`/`Bdata` only if actually damaged.)
 
-## Serial + U-Boot reference (as captured on the tested unit)
+## Serial + U-Boot reference (as captured on the tested unit, 2026-08-30)
 
 Wiring per rule 4; any terminal at 115200 8N1, flow control off.
 Interrupt within 5 s of power-on. The real menu:
@@ -144,17 +146,18 @@ harness and the recovery vehicle.
    is the flash slot, not TFTP).
 3. A root shell appears on serial; LAN comes up as `192.168.1.1`.
 
-This is the procedure that proved the port before anything was ever
-flashed: a RAM-booted image showed all 10 partitions with the exact
-stock layout, partition reads byte-identical to the backup, and both
-radios working (details in
+This is the procedure that verified this project's firmware on
+2026-08-31 before anything was flashed: a RAM-booted image showed all
+10 partitions with the exact stock layout, partition reads
+byte-identical to the backup, and both radios working (details in
 [RESEARCH-LOG.md](RESEARCH-LOG.md#timeline)). Use it the same way to
 vet any new build.
 
-## Reverting to X-Wrt
+## Reverting to X-Wrt (or to whatever was installed before)
 
 - From a working system: sysupgrade (fresh config) with the X-Wrt
-  image from `downloads.x-wrt.com/rom/`.
+  image from `downloads.x-wrt.com/rom/`, or with any other
+  OpenWrt-family image for this device.
 - From a broken system: recovery ladder step 2 or 3.
 
 ## Appendix: pb-boot — researched, declined
@@ -162,7 +165,7 @@ vet any new build.
 pb-boot is the community replacement bootloader for the R3
 (PandoraBox lineage). It would add LAN-cable web recovery — hold
 reset at power-on → upload page at `http://192.168.1.1` accepting
-this port's `breed-factory.bin` (or a TFTP push of it as
+this project's `breed-factory.bin` (or a TFTP push of it as
 `firmware.bin`).
 
 **Decision (2026-08-31): not installing.** That convenience does not
@@ -176,7 +179,7 @@ behavior, residual unknowns) is in
 Facts that matter even without installing it:
 
 - pb-boot/breed always boot `kernel_stock` (mtd7), ignoring Xiaomi's
-  A/B flags. This port's sysupgrade handles that: the dual-slot commit
+  A/B flags. This project's sysupgrade handles that: the dual-slot commit
   (`CI_KERNPART_EXT`) makes it write the kernel to **both** slots
   when it detects such a bootloader on mtd0 — a guarded no-op under
   stock U-Boot, kept for any R3 owner who does run pb-boot/breed.
@@ -185,7 +188,7 @@ Facts that matter even without installing it:
   `87c79881406cafa47853c734c76e1141`, sha256
   `c2235164b2dd676d9564defca9c8eefa3b447ac7f1b2966f0e1bef1145b7442a`)
   — hashes recorded so a copy can at least be matched against the
-  one that was analyzed.
+  one analyzed in August 2026.
 
 **If ever installing — the safe sequence** (each step gated on the
 last):

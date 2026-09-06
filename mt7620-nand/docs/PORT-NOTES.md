@@ -23,7 +23,7 @@ V22SG EVB), then lost it in the 4.4 → 4.9 bump:
 | `fddc78bc11` | 2017-07-05 | v4.9 bump deletes `patches-4.4/` incl. the 2,408-line NAND patch |
 | `dea9922acd` | 2018-04-06 | drops 4.9, removing the dead `CONFIG_MTD_NAND_MT7620` line |
 | `10f27c6f00` | 2020-04-01 | new clean MT7621 NAND driver |
-| `2f2e81a4ea` | 2022-01-19 | moved to `files/drivers/mtd/nand/raw/mt7621_nand.c`, where it lives today |
+| `2f2e81a4ea` | 2022-01-19 | moved to `files/drivers/mtd/nand/raw/mt7621_nand.c`, its location as of 2026 |
 
 `compatible = "mtk,mt7620-nand"` still appears in two upstream DTS
 files with no driver behind it.
@@ -40,9 +40,12 @@ other boards). ImmortalWrt's own `openwrt-18.06-k5.4` branch carries
 the identical patch — this port effectively forward-ports
 ImmortalWrt-lineage code.
 
-This repo therefore maintains the port **out of tree**: a patch
-series and an idempotent installer script that graft X-Wrt's driver
-and device support onto a current ImmortalWrt checkout.
+This repository therefore carries the port **out of tree**, as a
+fork of ImmortalWrt: a short commit series on top of an ImmortalWrt
+release tag adds X-Wrt's driver and device support. (Until
+2026-09-06 the same port was maintained in a separate repository as
+a patch series plus an installer script applied to upstream
+checkouts; see [RESEARCH-LOG.md](RESEARCH-LOG.md).)
 
 ## The NAND driver
 
@@ -207,12 +210,14 @@ Operating rules that follow from the vermagic design:
 
 ## Kernel/target choice
 
-The port targets both ImmortalWrt master (kernel 6.18 — the same
-kernel X-Wrt ships for this board, so porting changed one variable,
-the distro, not two) and the `v25.12.1` release (kernel 6.12 — a
-driver/kernel combination that had been compiled by no one, since
-x-wrt's mt7620 carries only `config-6.18`). Both combinations build
-green in CI and both have booted real hardware.
+Branch `25.12` pins the ImmortalWrt `v25.12.1` release (kernel 6.12).
+That driver/kernel combination had been compiled by no one before
+August 2026 — x-wrt's mt7620 carries only `config-6.18` — and it was
+built in CI and booted on real hardware that month. The driver was
+also built and booted on ImmortalWrt master with kernel 6.18 in
+August 2026 (the kernel X-Wrt ships for this board), so a future
+kernel bump starts from a known-good combination; only the release
+line is maintained here.
 
 ## Image formats and slot logic
 
@@ -250,8 +255,9 @@ upstream candidates independent of that question.
 ## Reference links
 
 - x-wrt: github.com/x-wrt/x-wrt · images: downloads.x-wrt.com/rom/
-- ImmortalWrt: github.com/immortalwrt/immortalwrt (master = 6.18,
-  openwrt-25.12 = 6.12, openwrt-18.06-k5.4 = 5.4)
+- ImmortalWrt: github.com/immortalwrt/immortalwrt (kernels as of
+  2026-09: master = 6.18, openwrt-25.12 = 6.12, openwrt-18.06-k5.4 =
+  5.4)
 - OpenWrt table of hardware: openwrt.org/toh/xiaomi/mir3 (listed
   unsupported)
 - Community history and further links:

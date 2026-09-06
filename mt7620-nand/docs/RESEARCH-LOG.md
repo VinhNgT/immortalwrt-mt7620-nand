@@ -11,6 +11,15 @@ All dates 2026. Everything was verified against primary sources (git
 history, raw file fetches, on-device inspection over serial), not
 wikis.
 
+Entries dated before 09-06 describe the predecessor repository,
+[VinhNgT/immortalwrt-miwifi-r3](https://github.com/VinhNgT/immortalwrt-miwifi-r3)
+(archived), where the port was a `patches/0001–0005` series plus an
+"apply script" (`scripts/apply-r3-support.sh`) that grafted the port
+onto a fresh upstream checkout in CI. "The installer" and "the apply
+script" below mean that script. On 09-06 the port moved into this
+fork as commits; the patch numbers map to commits as listed in
+[PORT-NOTES.md](PORT-NOTES.md#the-port--13-touch-points).
+
 ## Timeline
 
 - **08-29/30** — research: why the device fell out of OpenWrt, driver
@@ -26,6 +35,18 @@ wikis.
   declined. ECC defect root-caused and fixed (the ECC-report commit).
   ImageBuilder pipeline built, shaken out, fixed (the IB-feeds commit).
   CI caching added and audited through three runs. Docs consolidated.
+- **09-06** — repository restructured: the patch-series + apply-script
+  repository replaced by this fork of ImmortalWrt (branch `25.12` =
+  tag `v25.12.1` + the port as commits). Reason: the series and the
+  script were two hand-synchronised copies of the port and had
+  already diverged (the series targeted master/6.18 only, the script
+  handled 6.12 and 6.18), the script had three silent failure modes
+  (anchor-based inserts with no post-check; a kernel-config loop that
+  skipped symbols already marked "not set"), and the driver existed
+  in three copies. The fork's first build reproduced the predecessor's
+  `v25.12.1-r1` kernel package version and manifest exactly; it was
+  published as pre-release `v25.12.1-r1` without a new hardware boot
+  (no device at hand that day).
 
 ## Corrections — things that looked true and are wrong
 
@@ -111,7 +132,7 @@ Design constraint from the user: fix the root cause, don't suppress
 the messages — the printks were deliberately left untouched.
 
 Hardware verification went exactly as the mechanism predicts: the
-first boot of a the ECC-report commit build printed the corrections once
+first boot of an ECC-report build printed the corrections once
 (driver reported → UBI scrubbed/rewrote the blocks), and a reinstall
 of the same image booted with zero ECC lines — nothing left to
 correct
@@ -142,7 +163,7 @@ Proof before patch: hand-writing a `repositories` file listing only
 the per-arch userland feeds produced a 217-package image in ~1 min —
 kmods from the bundle at the exact kernel pin, userland fetched and
 signature-verified from the official feeds (the IB already ships the
-distro public keys). the IB-feeds commit then made the ImageBuilder emit
+distro public keys). The IB-feeds commit then made the ImageBuilder emit
 that file itself at build time.
 
 Two empirical details worth remembering:
@@ -153,10 +174,16 @@ Two empirical details worth remembering:
   (tested), but it's noisy on every run — `CONFIG_FEED_video=m`
   in the seed emits the URL commented out (feeds marked `=m` are
   emitted as comments by upstream's own `FeedSourcesAppendAPK`).
-- Every build is its own vermagic universe: two same-source CI runs
-  produced different kernel pins (`~b22042c4…` vs `~8e4ae743…`).
-  Never mix kmods across builds; each run's ImageBuilder serves that
-  run's image.
+- Every build is its own vermagic universe: two CI runs of the same
+  upstream commit produced different kernel pins (`~b22042c4…` vs
+  `~8e4ae743…`). Never mix kmods across builds; each run's
+  ImageBuilder serves that run's image. *Corrected 09-06:* the pin is
+  a hash of the kernel configuration and patches, so it is
+  reproducible when those inputs are identical — the fork's first
+  build, from the same tree and seed as the `~8e4ae743…` release,
+  reproduced that pin exactly. The two differing runs had different
+  seeds (the LuCI and ALL_KMODS changes landed between them). The
+  rule stands because any kernel-side change moves the pin.
 
 ## CI incidents and pipeline decisions
 
@@ -275,7 +302,8 @@ Still open: whether current OpenWrt maintainers would accept a proper
 driver in 2026 (the 2022 refusal is Golle's); whether the NAND is
 BMT-formatted (x-wrt's simple BBT works, mildly encouraging); whether
 U-Boot passes `bootargs` (env has none — the `cmdlinepart`
-mtd0-unlock trick was never tested and is moot now).
+mtd0-unlock trick was never tested, and is moot as long as stock
+U-Boot is kept and mtd0 is never written).
 
 ## Ranked approaches (from the original research)
 
@@ -283,11 +311,15 @@ mtd0-unlock trick was never tested and is moot now).
    months, refused twice, only worth it for its own sake.
 2. Same quality bar, ImmortalWrt only — plausible; they ship the patch
    on 18.06-k5.4. No ImmortalWrt issue/PR mentions miwifi-r3.
-3. Fork ImmortalWrt master, lift the two x-wrt commits — **done, this
-   repo.**
-4. Same against openwrt-25.12 (6.12) — **done**; the installer script
-   is version-aware.
-5. Rebasable patch series + CI — **done, this repo.**
+3. Fork ImmortalWrt, lift the two x-wrt commits — **done: this
+   repository is that fork** (on the 25.12 release rather than master,
+   since 09-06).
+4. Same against openwrt-25.12 (6.12) — **done** (08-31 in the
+   predecessor, whose installer script was version-aware; the fork
+   pins one release per branch).
+5. Rebasable patch series + CI — **done 08-30 in the predecessor
+   repository, replaced by the fork on 09-06** (see the timeline
+   entry for why).
 6. Stay on X-Wrt — the fallback that remains available.
 7. SDK-backport packages onto 18.06-k5.4 — leaf packages only.
 8. Kernel in NAND, rootfs on USB — fails on initramfs/extroot

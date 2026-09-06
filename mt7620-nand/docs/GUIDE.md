@@ -5,13 +5,21 @@ installing, upgrading, adding packages, and the quirks worth knowing.
 Before your first ever flash — and whenever something goes wrong —
 read [RECOVERY.md](RECOVERY.md).
 
+"This project" below means the firmware published by this
+repository. It is stock ImmortalWrt plus support for this router's
+NAND flash; nothing else is changed, so general ImmortalWrt/OpenWrt
+documentation applies to everything not mentioned here.
+
 ## Getting firmware
 
 Firmware comes from this repo's **GitHub releases**. Releases are
 tagged `<immortalwrt-version>-rN` (for example `v25.12.1-r2`): the
-ImmortalWrt version plus a port build number. When several releases
-exist for the same ImmortalWrt version, take the newest `-rN` unless
-its notes say otherwise.
+ImmortalWrt version plus a build number. When several releases exist
+for the same ImmortalWrt version, take the newest `-rN` unless its
+notes say otherwise. A release marked **pre-release** was not booted
+on a router before publishing; its notes say why. Prefer the newest
+release that is not a pre-release unless you can recover the device
+yourself.
 
 Each release contains:
 
@@ -52,11 +60,11 @@ CLI equivalent: `scp` the image to `/tmp`, then
 
 The stock web UI does not accept these images. Establish an
 OpenWrt-family firmware first (the community-documented X-Wrt install
-route), or — with a serial console — RAM-boot this port's initramfs
+route), or — with a serial console — RAM-boot this project's initramfs
 image and run sysupgrade from there
 ([RECOVERY.md](RECOVERY.md#ram-booting-an-initramfs-image-proven-procedure)).
 
-### Between releases of this port
+### Between releases of this project
 
 Plain sysupgrade, and keeping settings is fine. After the upgrade,
 switch to the new release's ImageBuilder for any kernel-module work
@@ -91,7 +99,10 @@ make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci kmod-batman-adv luci-proto-ba
 ```
 
 A fresh `sysupgrade.bin` appears in `bin/targets/ramips/mt7620/` in
-about a minute — flash it with "Keep settings" checked.
+about a minute — flash it with "Keep settings" checked. Always pass
+`PROFILE=xiaomi_miwifi-r3`: `make info` lists every mt7620 device
+ImmortalWrt knows, but only this profile has the NAND support this
+project adds.
 
 **B. Install directly, no reflash:** the ImageBuilder's `packages/`
 directory holds every `kmod-*.apk`; copy the one you need (plus any

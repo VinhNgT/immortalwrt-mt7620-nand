@@ -4,12 +4,12 @@
 > This project is vibe coded with Anthropic Claude Fable 5 — use at your own risk.
 
 Modern, maintained firmware for the Xiaomi Mi Router 3. Official
-OpenWrt dropped this device years ago because mainline Linux lost the
-driver for its NAND storage; this project keeps it alive on **current
-ImmortalWrt** by maintaining that driver and the device support as a
-short commit series on top of the ImmortalWrt release — with
-everything a user expects: LuCI web UI, current kernel, installable
-packages, and safe upgrades.
+OpenWrt dropped this device in 2017, when the kernel bump to 4.9 lost
+the driver for its NAND storage; this project keeps the device alive
+on a **current ImmortalWrt release** by maintaining that driver and
+the device support as a short commit series on top of the release —
+with everything a user expects: LuCI web UI, current kernel,
+installable packages, and safe upgrades.
 
 This repository is a fork of
 [immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt).
@@ -19,14 +19,21 @@ target.
 
 ## Status
 
-Complete, verified on real hardware.
+Complete, verified on real hardware (a Mi Router 3 unit, August
+2026, ImmortalWrt `v25.12.1` with kernel 6.12).
 
 - Everything works: WiFi (2.4 + 5 GHz), switch, USB, web UI, storage,
-  normal sysupgrade — on ImmortalWrt `v25.12.1` (kernel 6.12).
+  normal sysupgrade.
 - Installing never touches the bootloader, and every failure state
   short of deliberately destroying the bootloader is recoverable.
-- The NAND driver's silent error-handling defect was fixed along the
-  way — flash bit-errors now heal themselves automatically.
+- The NAND driver as inherited silently swallowed corrected flash
+  bit-errors, so they were never healed; this project fixes that, and
+  the firmware repairs such errors automatically.
+
+The pinned ImmortalWrt version is the branch you are looking at:
+branch `25.12` is the upstream tag `v25.12.1` plus this project's
+commits. Each GitHub release names the exact upstream commit it was
+built from.
 
 ## Hardware
 
@@ -79,10 +86,11 @@ covers both, plus the quirks worth knowing.
 - [mt7620-nand/docs/RESEARCH-LOG.md](mt7620-nand/docs/RESEARCH-LOG.md) — how the conclusions
   were reached, dead ends included
 
-The port was first developed in
+History: from August to September 2026 the port lived in
 [VinhNgT/immortalwrt-miwifi-r3](https://github.com/VinhNgT/immortalwrt-miwifi-r3)
-as a patch series applied to upstream checkouts; that repository is
-archived and this fork supersedes it.
+as a patch series applied to upstream checkouts. That repository is
+archived; this fork replaced it on 2026-09-06 and its release
+`v25.12.1-r1` is the same firmware as that repository's `v25.12.1-r1`.
 
 ## Credits & license
 

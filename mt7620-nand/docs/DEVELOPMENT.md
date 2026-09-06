@@ -7,9 +7,10 @@ and follow upstream. What the port changes and why:
 
 ## How the repository is structured
 
-This is a fork of ImmortalWrt. One branch per upstream release line;
-today that is `25.12`, which is the upstream tag `v25.12.1` plus a
-short commit series:
+This is a fork of ImmortalWrt. One branch per upstream release line
+(`git branch -r` lists them); the first, created 2026-09-06, is
+`25.12`, which is the upstream tag `v25.12.1` plus a short commit
+series:
 
 ```text
 v25.12.1 (upstream)
@@ -160,7 +161,8 @@ The authoritative documentation is the comments in
 
 ## Following upstream
 
-**ImmortalWrt point release** (expect one every one to three months):
+**ImmortalWrt point release** (expect one every one to three months;
+the 24.10 line had six between April 2025 and April 2026):
 
 ```bash
 git remote add upstream https://github.com/immortalwrt/immortalwrt.git   # once
@@ -198,8 +200,9 @@ compare them against the blob hashes in
 prints a diff against the tree; port what is relevant as a new
 commit, re-apply the ECC-report change if the driver was touched,
 and update PROVENANCE.md with the new HEAD sha and hashes. x-wrt
-tracks OpenWrt master (kernel 6.18), so a cherry-pick would not apply
-cleanly here anyway — hand-porting is the honest form.
+tracks OpenWrt master (kernel 6.18 as of 2026-09), so a cherry-pick
+would not apply cleanly onto a release branch anyway — hand-porting
+is the honest form.
 
 ## Validating changes on hardware
 
