@@ -60,7 +60,7 @@ jobs:
             }
           fi
 
-      # The mt7620-nand kernel config is defined as mt7620's config plus a
+      # The mt7620_nand kernel config is defined as mt7620's config plus a
       # fragment; a rebase that moves mt7620's config must regenerate it.
       - name: Check the subtarget kernel config is in sync
         run: sh mt7620-nand/scripts/sync-subtarget-config.sh --check
@@ -147,7 +147,7 @@ jobs:
           make defconfig
           # defconfig silently drops symbols whose prompt is hidden (CCACHE
           # needs DEVEL) - fail loudly if a load-bearing one went missing
-          grep -q "CONFIG_TARGET_ramips_mt7620-nand_DEVICE_xiaomi_miwifi-r3=y" .config
+          grep -q "CONFIG_TARGET_ramips_mt7620_nand_DEVICE_xiaomi_miwifi-r3=y" .config
           grep -q "^CONFIG_CCACHE=y" .config
           grep -q "^CONFIG_ALL_KMODS=y" .config
           grep -q "^CONFIG_IB=y" .config
@@ -217,9 +217,9 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p out
-          cp bin/targets/ramips/mt7620-nand/*miwifi-r3* out/
-          cp bin/targets/ramips/mt7620-nand/sha256sums out/
-          cp bin/targets/ramips/mt7620-nand/immortalwrt-imagebuilder-*.tar.* out/
+          cp bin/targets/ramips/mt7620_nand/*miwifi-r3* out/
+          cp bin/targets/ramips/mt7620_nand/sha256sums out/
+          cp bin/targets/ramips/mt7620_nand/immortalwrt-imagebuilder-*.tar.* out/
           ls -la out/
           kernel=$(awk '$1 == "kernel" { print $3 }' out/*.manifest | head -n1)
           echo "KERNEL_VERSION=$kernel" >> "$GITHUB_ENV"

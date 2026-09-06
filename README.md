@@ -14,7 +14,7 @@ installable packages, and safe upgrades.
 This repository is a fork of
 [immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt).
 Branch `25.12` is the ImmortalWrt `v25.12.1` tag plus the port; the
-name refers to the `mt7620-nand` support it adds to the `ramips`
+name refers to the `mt7620_nand` subtarget it adds to the `ramips`
 target.
 
 ## Status

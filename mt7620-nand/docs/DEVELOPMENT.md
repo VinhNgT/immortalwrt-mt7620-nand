@@ -39,7 +39,7 @@ elsewhere:
 | `mt7620-nand/config.seed` | build seed (target + device + LuCI + kmod/IB/ccache options, each explained inline) |
 | `mt7620-nand/scripts/tag-release.sh` | cuts a release: computes the next `<upstream>-rN`, tags HEAD, pushes |
 | `mt7620-nand/scripts/check-xwrt-drift.sh` | reports whether x-wrt master's versions of the four ported files changed |
-| `mt7620-nand/scripts/sync-subtarget-config.sh`, `mt7620-nand/subtarget-kconfig.fragment` | regenerates (or, with `--check`, verifies) the mt7620-nand kernel config as mt7620's config plus the fragment |
+| `mt7620-nand/scripts/sync-subtarget-config.sh`, `mt7620-nand/subtarget-kconfig.fragment` | regenerates (or, with `--check`, verifies) the mt7620_nand kernel config as mt7620's config plus the fragment |
 | `mt7620-nand/docker/`, `mt7620-nand/build.ps1` | local containerized build of the current checkout |
 | `mt7620-nand/docs/` | this documentation; `mt7620-nand/docs/boot-logs/` holds archived serial logs |
 | `mt7620-nand/.gitignore` | ignores `PRIVATE-NOTES.md` and `out/` inside the folder |
@@ -64,7 +64,7 @@ git commit    # attribute the driver, DTS and device support to Chen Minqiang (x
 What upstream would additionally ask for is content, not layout:
 mainly a driver rewritten on the rawnand framework
 ([PORT-NOTES.md](PORT-NOTES.md#upstreaming-outlook)); the
-`mt7620-nand` subtarget it also asked for is already the shape of
+`mt7620_nand` subtarget it also asked for is already the shape of
 this tree.
 
 ## Building
@@ -79,7 +79,7 @@ cp mt7620-nand/config.seed .config && make defconfig
 make -j"$(nproc)" download && make -j"$(nproc)"
 ```
 
-Images land in `bin/targets/ramips/mt7620-nand/`.
+Images land in `bin/targets/ramips/mt7620_nand/`.
 
 **Docker** (Windows host): `.\mt7620-nand\build.ps1` — builds the
 `iwrt-builder` image, fetches the *current local commit* of this
@@ -179,7 +179,7 @@ Conflicts can only occur in the handful of upstream files the port
 edits (listed in [PORT-NOTES.md](PORT-NOTES.md)) and in `README.md`,
 where the answer is always "keep ours". After the rebase run
 `sh mt7620-nand/scripts/sync-subtarget-config.sh` and commit the
-regenerated `target/linux/ramips/mt7620-nand/config-<kv>` if it
+regenerated `target/linux/ramips/mt7620_nand/config-<kv>` if it
 changed (CI checks it). Then push a test build,
 RAM-boot it, and force-push the branch with `--force-with-lease`.
 Old release tags keep the previous trees reachable. Update the

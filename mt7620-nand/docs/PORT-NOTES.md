@@ -102,10 +102,16 @@ docs use for them:
 
 The subtarget commit (2026-09-06) is the shape the upstream reviewer
 asked for (below): everything device-specific lives in
-`target/linux/ramips/mt7620-nand/` and `image/mt7620-nand.mk`, and
+`target/linux/ramips/mt7620_nand/` and `image/mt7620_nand.mk`, and
 the shared `mt7620` subtarget is left as upstream ships it apart from
 one line disabling the new Kconfig symbol. Touch points 5–9 below
 name the files as they are after that commit.
+The subtarget is spelled `mt7620_nand` with an underscore, following
+upstream's own compound subtarget names (`realtek/rtl930x_nand`,
+`lantiq/xrx200_legacy`): `scripts/target-metadata.pl` uses the raw
+subtarget name when it generates the `TARGET_SUBTARGET` string default,
+so a hyphenated name leaves that string unset and the build falls back
+to the first subtarget.
 
 1. `files/drivers/mtd/maps/ralink_nand.c` — the driver (new file)
 2. `files/drivers/mtd/maps/ralink_nand.h` — (new file)
@@ -115,19 +121,19 @@ name the files as they are after that commit.
 4. `dts/mt7620a_xiaomi_miwifi-r3.dts` — device tree; x-wrt master's
    version (modernized `nvmem-layout`; the 18.06-era one uses removed
    bindings)
-5. `image/mt7620-nand.mk` — device/image recipe (formats below); the
+5. `image/mt7620_nand.mk` — device/image recipe (formats below); the
    only device in the subtarget
-6. `mt7620-nand/target.mk` — mt7620's target.mk with `nand` added to
+6. `mt7620_nand/target.mk` — mt7620's target.mk with `nand` added to
    `FEATURES` (and `target/linux/ramips/Makefile` lists the subtarget)
-7. `mt7620-nand/config-<kv>` — mt7620's kernel config plus
+7. `mt7620_nand/config-<kv>` — mt7620's kernel config plus
    `MTD_NAND_MT7620`, UBI, UBIFS + compression dependencies. Generated:
    `mt7620-nand/scripts/sync-subtarget-config.sh` merges
    `mt7620-nand/subtarget-kconfig.fragment` into mt7620's config with
    upstream's `scripts/kconfig.pl`, and CI fails if the committed file
    drifts from that merge
-8. `mt7620-nand/base-files/lib/upgrade/platform.sh` — nand sysupgrade
+8. `mt7620_nand/base-files/lib/upgrade/platform.sh` — nand sysupgrade
    with bootloader/slot detection (only this subtarget's boards)
-9. `mt7620-nand/base-files/etc/board.d/02_network` — switch ports
+9. `mt7620_nand/base-files/etc/board.d/02_network` — switch ports
    (`1:lan 4:lan 0:wan 6@eth0`) + MACs from the `factory` partition
    at offset 0x28 (only this subtarget's boards; mt7620's other
    base-files are per-board case lists the R3 does not appear in, and

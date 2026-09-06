@@ -1,10 +1,10 @@
 #!/bin/sh
-# sync-subtarget-config.sh - regenerate (or verify) the mt7620-nand kernel
+# sync-subtarget-config.sh - regenerate (or verify) the mt7620_nand kernel
 # config from mt7620's config plus this project's fragment.
 #
 #   usage: mt7620-nand/scripts/sync-subtarget-config.sh [--check]
 #
-# target/linux/ramips/mt7620-nand/config-<kv> is by definition
+# target/linux/ramips/mt7620_nand/config-<kv> is by definition
 # "mt7620's config-<kv> with the NAND/UBI symbols from
 # mt7620-nand/subtarget-kconfig.fragment on top", merged with the tree's
 # own scripts/kconfig.pl so the result has OpenWrt's canonical layout.
@@ -17,7 +17,7 @@ HERE=$(cd "$(dirname "$0")/../.." && pwd)
 R="$HERE/target/linux/ramips"
 KV=$(sed -n 's/^KERNEL_PATCHVER:=\(.*\)$/\1/p' "$R/Makefile")
 BASE="$R/mt7620/config-$KV"
-OUT="$R/mt7620-nand/config-$KV"
+OUT="$R/mt7620_nand/config-$KV"
 FRAG="$HERE/mt7620-nand/subtarget-kconfig.fragment"
 
 [ -f "$BASE" ] || { echo "ERROR: $BASE not found" >&2; exit 1; }
@@ -27,7 +27,7 @@ perl "$HERE/scripts/kconfig.pl" '+' "$BASE" "$FRAG" > "$TMP"
 
 if [ "${1:-}" = "--check" ]; then
 	if diff -u "$OUT" "$TMP"; then
-		echo "mt7620-nand/config-$KV is in sync with mt7620/config-$KV + fragment"
+		echo "mt7620_nand/config-$KV is in sync with mt7620/config-$KV + fragment"
 	else
 		echo "ERROR: $OUT differs from mt7620/config-$KV + fragment - run $0" >&2
 		exit 1

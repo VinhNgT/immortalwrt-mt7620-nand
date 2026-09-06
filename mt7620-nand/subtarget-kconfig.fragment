@@ -1,6 +1,6 @@
-# Kernel options the mt7620-nand subtarget adds on top of mt7620's
+# Kernel options the mt7620_nand subtarget adds on top of mt7620's
 # config. mt7620-nand/scripts/sync-subtarget-config.sh merges this into
-# target/linux/ramips/mt7620-nand/config-<kv> with scripts/kconfig.pl.
+# target/linux/ramips/mt7620_nand/config-<kv> with scripts/kconfig.pl.
 CONFIG_CRC16=y
 CONFIG_CRYPTO_DEFLATE=y
 CONFIG_CRYPTO_HASH_INFO=y

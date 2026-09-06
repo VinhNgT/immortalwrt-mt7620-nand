@@ -47,7 +47,7 @@ fork as commits; the patch numbers map to commits as listed in
   `v25.12.1-r1` kernel package version and manifest exactly; it was
   published as pre-release `v25.12.1-r1` without a new hardware boot
   (no device at hand that day). Same day: the R3 moved into its own
-  `mt7620-nand` subtarget (the shape the 2022 upstream review asked
+  `mt7620_nand` subtarget (the shape the 2022 upstream review asked
   for), which also made the predecessor's "trim mt7620.mk to one
   device" script unnecessary — the ImageBuilder now offers one
   profile because the subtarget contains one device.
@@ -311,7 +311,7 @@ U-Boot is kept and mtd0 is never written).
 
 ## Ranked approaches (from the original research)
 
-1. Mainline-quality driver + `mt7620-nand` subtarget → OpenWrt PR —
+1. Mainline-quality driver + `mt7620_nand` subtarget → OpenWrt PR —
    months, refused twice, only worth it for its own sake.
 2. Same quality bar, ImmortalWrt only — plausible; they ship the patch
    on 18.06-k5.4. No ImmortalWrt issue/PR mentions miwifi-r3.
