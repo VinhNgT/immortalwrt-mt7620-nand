@@ -1,0 +1,299 @@
+name: release
+
+# Builds THIS tree. There are no version inputs anywhere: the checkout is
+# the pinned combination of ImmortalWrt and X-Wrt-derived code, so the
+# same commit produces the same firmware wherever it is built.
+#
+# Two triggers:
+#
+#  - Tag push (v<upstream-version>-rN, cut by
+#    mt7620-nand/scripts/tag-release.sh): builds the tagged commit and
+#    publishes an immutable GitHub release for it. The tag's version
+#    prefix must equal the tree's upstream base tag (checked below).
+#
+#  - workflow_dispatch: test build of whatever branch/commit was selected
+#    in the Actions UI — uploads artifacts, publishes nothing.
+#
+# Releases are never modified after publishing: every build has a unique
+# kernel vermagic, so a release's bundled ImageBuilder must stay
+# downloadable unchanged for as long as anyone runs that release's image.
+# A rebuild is always a new -rN tag.
+on:
+  push:
+    tags: ["v*-r[0-9]*"]
+  workflow_dispatch:
+
+# Needed to create releases with the default GITHUB_TOKEN.
+permissions:
+  contents: write
+
+# One build at a time - concurrent runs would fight over the caches.
+concurrency:
+  group: release-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      # Full history without blobs: git describe needs the tag graph to
+      # find the upstream base, and blobs are only fetched for HEAD's tree.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      # BASE_REF is the nearest upstream release tag below HEAD (v25.12.1,
+      # ...). Our own release tags (v25.12.1-r3) are excluded from the
+      # search so a tagged HEAD still resolves to its upstream base.
+      - name: Resolve build parameters
+        run: |
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-r[0-9]*' HEAD)
+          echo "BASE_REF=$base" >> "$GITHUB_ENV"
+          echo "BASE_SHA=$(git rev-parse "$base^{commit}")" >> "$GITHUB_ENV"
+          echo "upstream base: $base"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+            [ "${GITHUB_REF_NAME%-r*}" = "$base" ] || {
+              echo "ERROR: tag $GITHUB_REF_NAME does not match upstream base $base" >&2
+              exit 1
+            }
+          fi
+
+      # The mt7620_nand kernel config is defined as mt7620's config plus a
+      # fragment; a rebase that moves mt7620's config must regenerate it.
+      # Disk headroom check only. GitHub's ubuntu runners have ~88 GB free
+      # on a 145 GB disk (measured 2026-08); this build peaks around
+      # 30-40 GB, so no cleanup of preinstalled software is needed. Should
+      # a run ever fail with "No space left on device", the classic fix is
+      # deleting /usr/share/dotnet /usr/local/lib/android
+      # /opt/hostedtoolcache/CodeQL here (~18 GB) before building.
+      - name: Report disk space
+        run: df -h /
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses-dev libssl-dev python3-setuptools rsync swig \
+            unzip zlib1g-dev file wget libelf-dev zstd
+
+      # ---- caches -------------------------------------------------------
+      # dl/: checksum-verified tarballs; frozen per upstream release, so an
+      # exact-key hit is complete and a miss saves once after `make download`.
+      - name: Restore download cache
+        id: cache-dl
+        uses: actions/cache/restore@v6
+        with:
+          path: dl
+          key: dl-${{ env.BASE_REF }}
+          restore-keys: |
+            dl-
+
+      # Toolchain + host tools (~35-40 min cold). Keyed on the
+      # toolchain-defining source trees AND config.seed. The seed matters
+      # because build options (e.g. CCACHE wrapping the compilers) enter
+      # every package's configure fingerprint: restoring trees that were
+      # built under a different config makes make re-run configure on
+      # dirty state, which fails. Either changing must miss cleanly and
+      # rebuild from scratch. No fallback key on purpose.
+      - name: Restore toolchain cache
+        id: cache-toolchain
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            staging_dir/host*
+            staging_dir/toolchain-*
+            build_dir/host*
+            build_dir/toolchain-*
+          key: toolchain-${{ hashFiles('tools/**', 'toolchain/**', 'mt7620-nand/config.seed') }}
+
+      # Cached stamps must be newer than the freshly-checked-out sources or
+      # make re-does the work the cache was meant to skip.
+      - name: Refresh cached toolchain timestamps
+        if: steps.cache-toolchain.outputs.cache-hit == 'true'
+        run: find staging_dir build_dir -type f -print0 | xargs -0 -r touch -c
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ccache-${{ env.BASE_REF }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ env.BASE_REF }}-
+
+      # feeds.conf.default pins every feed to an exact commit on release
+      # tags, so the checkout is deterministic; a hit turns
+      # `feeds update -a` (~90s of clones) into a no-op walk.
+      - name: Restore feeds cache
+        id: cache-feeds
+        uses: actions/cache/restore@v6
+        with:
+          path: feeds
+          key: feeds-${{ hashFiles('feeds.conf.default') }}
+      # -------------------------------------------------------------------
+
+      - name: Install feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      # mt7620_nand is mt7620 plus NAND: its kernel config must equal
+      # mt7620's plus the fragment, and every dependency gate on the
+      # mt7620 subtarget name - in the tree and in the feeds just
+      # installed - must name mt7620_nand too (the script's header says
+      # why). Runs before the toolchain so a drift fails in minutes.
+      - name: Check the subtarget is mt7620 plus NAND
+        run: sh mt7620-nand/scripts/sync-subtarget-config.sh --check
+
+      - name: Configure
+        run: |
+          mkdir -p .ccache
+          printf 'max_size = 1.5G\n' > .ccache/ccache.conf
+          cp mt7620-nand/config.seed .config
+          make defconfig
+          # defconfig silently drops symbols whose prompt is hidden (CCACHE
+          # needs DEVEL) - fail loudly if a load-bearing one went missing
+          grep -q "CONFIG_TARGET_ramips_mt7620_nand_DEVICE_xiaomi_miwifi-r3=y" .config
+          grep -q "^CONFIG_CCACHE=y" .config
+          grep -q "^CONFIG_ALL_KMODS=y" .config
+          grep -q "^CONFIG_IB=y" .config
+          # a default package whose dependency gate omits this subtarget is
+          # dropped just as silently - both radios must have made it in
+          grep -q "^CONFIG_PACKAGE_kmod-rt2800-soc=y" .config
+          grep -q "^CONFIG_PACKAGE_kmod-mt76x2=y" .config
+
+      - name: Save feeds cache
+        if: steps.cache-feeds.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: feeds
+          key: ${{ steps.cache-feeds.outputs.cache-primary-key }}
+
+      - name: Build toolchain
+        run: |
+          make -j"$(nproc)" tools/install
+          make -j"$(nproc)" toolchain/install
+
+      - name: Save toolchain cache
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            staging_dir/host*
+            staging_dir/toolchain-*
+            build_dir/host*
+            build_dir/toolchain-*
+          key: ${{ steps.cache-toolchain.outputs.cache-primary-key }}
+
+      - name: Download sources
+        run: make -j"$(nproc)" download
+
+      - name: Save download cache
+        if: steps.cache-dl.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: dl
+          key: dl-${{ env.BASE_REF }}
+
+      # Deliberately no "|| make -j1 V=s world" retry: CONFIG_BUILD_LOG=y
+      # already writes per-package logs (uploaded on failure below), and a
+      # serial rerun would spend up to an hour reproducing the same failure.
+      - name: Build
+        run: make -j"$(nproc)" world
+
+      # Save even on a failed build so the retry is cheap.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-${{ env.BASE_REF }}-${{ github.run_id }}
+
+      # CONFIG_BUILD_LOG=y writes per-package logs; without this a quiet
+      # "-C toolchain/binutils ... failed to build" is undiagnosable.
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-logs
+          path: logs/
+          if-no-files-found: ignore
+
+      # Everything a release needs: all image formats + manifest,
+      # sha256sums, and the ImageBuilder matching this exact build. The
+      # kernel package version (vermagic) goes to the job summary: it only
+      # changes when kernel-side inputs change, so it is the quickest
+      # "did this change touch the kernel?" check.
+      - name: Collect release assets
+        run: |
+          mkdir -p out
+          cp bin/targets/ramips/mt7620_nand/*miwifi-r3* out/
+          cp bin/targets/ramips/mt7620_nand/sha256sums out/
+          cp bin/targets/ramips/mt7620_nand/immortalwrt-imagebuilder-*.tar.* out/
+          ls -la out/
+          kernel=$(awk '$1 == "kernel" { print $3 }' out/*.manifest | head -n1)
+          echo "KERNEL_VERSION=$kernel" >> "$GITHUB_ENV"
+          {
+            echo "### Build"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| upstream base | \`$BASE_REF\` (\`$BASE_SHA\`) |"
+            echo "| port commit | \`$GITHUB_SHA\` |"
+            echo "| kernel package | \`$kernel\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Test builds (workflow_dispatch) get artifacts instead of a release.
+      - name: Upload artifacts (test build)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: immortalwrt-xiaomi-miwifi-r3
+          path: out/
+
+      # gh is preinstalled on GitHub-hosted runners (not an extra
+      # dependency) and is the least-fragile way to create a release with
+      # assets; the raw REST equivalent is two endpoints plus MIME handling.
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          xwrt=$(sed -n 's/.*at HEAD \*\*\([0-9a-f]\{40\}\)\*\*.*/\1/p' mt7620-nand/docs/PROVENANCE.md | head -n1)
+          # A "Prerelease: <reason>" trailer in the tag annotation (written by
+          # tag-release.sh -p) makes this a GitHub pre-release with a warning
+          # on top of the notes.
+          pre=$(git for-each-ref "refs/tags/$RELEASE_TAG" --format='%(contents)' \
+            | sed -n 's/^Prerelease: //p' | head -n1)
+          {
+            if [ -n "$pre" ]; then
+              echo "> [!WARNING]"
+              echo "> **Pre-release — not verified on hardware.** $pre"
+              echo "> Prefer the newest non-pre-release build unless you can recover the device yourself (see mt7620-nand/docs/RECOVERY.md)."
+              echo
+            fi
+            echo "ImmortalWrt \`$BASE_REF\` (upstream commit \`$BASE_SHA\`) for the Xiaomi Mi Router 3,"
+            echo "built from port commit \`$GITHUB_SHA\` (x-wrt provenance \`${xwrt:-unknown}\`, see mt7620-nand/docs/PROVENANCE.md)."
+            echo
+            echo "Kernel package version: \`$KERNEL_VERSION\`"
+            echo
+            echo "**Assets**: sysupgrade image (normal upgrade), initramfs (TFTP RAM-boot"
+            echo "test/recovery), factory/breed/split recovery formats, \`sha256sums\`, and"
+            echo "this build's ImageBuilder."
+            echo
+            echo "**Kernel modules are tied to this exact build** (vermagic): install"
+            echo "kmods only from *this release's* ImageBuilder, never from another"
+            echo "release or the official feeds. See mt7620-nand/docs/GUIDE.md for ImageBuilder usage."
+          } > notes.md
+
+          # If a previous publish attempt half-succeeded, this fails on the
+          # already-existing release: inspect it, delete it if incomplete,
+          # then re-run this workflow run (the tag itself stays valid).
+          gh release create "$RELEASE_TAG" \
+            --verify-tag ${pre:+--prerelease} \
+            --title "ImmortalWrt $BASE_REF for Mi Router 3 ($RELEASE_TAG)" \
+            --notes-file notes.md \
+            out/*
+          echo "Published release $RELEASE_TAG${pre:+ (pre-release)}"
