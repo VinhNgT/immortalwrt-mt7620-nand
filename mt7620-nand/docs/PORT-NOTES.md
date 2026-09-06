@@ -98,6 +98,14 @@ docs use for them:
 | dual-slot | `base-files: nand: support writing the kernel to a second partition` | 11 |
 | ECC-report | `ramips: ralink_nand: report corrected bitflips so UBI can scrub` | 12 |
 | IB-feeds | `imagebuilder: list remote userland feeds in standalone apk builds` | 13 |
+| subtarget | `ramips: add mt7620-nand subtarget and move the Xiaomi Mi Router R3 to it` | 5–9 moved into `mt7620-nand/` |
+
+The subtarget commit (2026-09-06) is the shape the upstream reviewer
+asked for (below): everything device-specific lives in
+`target/linux/ramips/mt7620-nand/` and `image/mt7620-nand.mk`, and
+the shared `mt7620` subtarget is left as upstream ships it apart from
+one line disabling the new Kconfig symbol. Touch points 5–9 below
+name the files as they are after that commit.
 
 1. `files/drivers/mtd/maps/ralink_nand.c` — the driver (new file)
 2. `files/drivers/mtd/maps/ralink_nand.h` — (new file)
@@ -107,15 +115,23 @@ docs use for them:
 4. `dts/mt7620a_xiaomi_miwifi-r3.dts` — device tree; x-wrt master's
    version (modernized `nvmem-layout`; the 18.06-era one uses removed
    bindings)
-5. `image/mt7620.mk` — device/image recipe (formats below)
-6. `mt7620/target.mk` — `FEATURES += nand`
-7. `mt7620/config-<kv>` — `MTD_NAND_MT7620`, UBI, UBIFS + compression
-   dependencies
-8. `mt7620/base-files/lib/upgrade/platform.sh` — nand sysupgrade with
-   bootloader/slot detection
-9. `mt7620/base-files/etc/board.d/02_network` — switch ports
+5. `image/mt7620-nand.mk` — device/image recipe (formats below); the
+   only device in the subtarget
+6. `mt7620-nand/target.mk` — mt7620's target.mk with `nand` added to
+   `FEATURES` (and `target/linux/ramips/Makefile` lists the subtarget)
+7. `mt7620-nand/config-<kv>` — mt7620's kernel config plus
+   `MTD_NAND_MT7620`, UBI, UBIFS + compression dependencies. Generated:
+   `mt7620-nand/scripts/sync-subtarget-config.sh` merges
+   `mt7620-nand/subtarget-kconfig.fragment` into mt7620's config with
+   upstream's `scripts/kconfig.pl`, and CI fails if the committed file
+   drifts from that merge
+8. `mt7620-nand/base-files/lib/upgrade/platform.sh` — nand sysupgrade
+   with bootloader/slot detection (only this subtarget's boards)
+9. `mt7620-nand/base-files/etc/board.d/02_network` — switch ports
    (`1:lan 4:lan 0:wan 6@eth0`) + MACs from the `factory` partition
-   at offset 0x28
+   at offset 0x28 (only this subtarget's boards; mt7620's other
+   base-files are per-board case lists the R3 does not appear in, and
+   ramips' shared base-files apply to every subtarget)
 10. `package/boot/uboot-tools/uboot-envtools/files/ramips` —
     fw_printenv config (env on mtd1, offset 0x0, size 0x1000, sector
     0x20000)
@@ -131,9 +147,10 @@ docs use for them:
 13. `target/imagebuilder/Makefile` — userland feeds in the standalone
     apk ImageBuilder (the IB-feeds commit, ours — below)
 
-`mt76x8/config-<kv>` additionally needs
-`# CONFIG_MTD_NAND_MT7620 is not set` — mt76x8 is also `SOC_MT7620`,
-so the new Kconfig symbol becomes visible there.
+`mt7620/config-<kv>` and `mt76x8/config-<kv>` additionally carry
+`# CONFIG_MTD_NAND_MT7620 is not set` — both are `SOC_MT7620`, so the
+new Kconfig symbol is visible there, and an explicit "not set" keeps
+upstream's kernel-config refresh tooling from asking about it.
 
 ## The ECC-report commit — ECC corrections must reach MTD
 
@@ -242,15 +259,17 @@ kernel to the slot(s) that bootloader will actually read.
 
 ## Upstreaming outlook
 
-Adding `nand` to the shared mt7620 subtarget is fine for this repo
-(only the R3 profile is built) but is exactly what a mainline PR
-would be rejected for — a PR-quality version needs a
-`ramips/mt7620-nand` subtarget, and the driver itself would need a
-rawnand-framework rewrite. Encouragingly, mt7621 already ships
+The 2022 upstream review (openwrt/openwrt#9344) asked for two things:
+a separate `ramips/mt7620-nand` subtarget instead of enabling `nand`
+on the shared mt7620 one, and a driver rewritten on the rawnand
+framework. The subtarget exists here since 2026-09-06 (the subtarget
+commit above), so the remaining gap to a mainline-quality submission
+is the driver rewrite. Encouragingly, mt7621 already ships
 `FEATURES+=nand` with 46 UBI recipes, so the
 ubinize/UBI/nand_do_upgrade pipeline is proven in this target tree.
-the ECC-report commit (x-wrt) and 0005 (ImmortalWrt) are self-contained
-upstream candidates independent of that question.
+The ECC-report commit (for x-wrt) and the IB-feeds commit (for
+ImmortalWrt) are self-contained upstream candidates independent of
+that question.
 
 ## Reference links
 

@@ -98,11 +98,11 @@ tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/
 make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci kmod-batman-adv luci-proto-batman-adv batctl-default"
 ```
 
-A fresh `sysupgrade.bin` appears in `bin/targets/ramips/mt7620/` in
-about a minute — flash it with "Keep settings" checked. Always pass
-`PROFILE=xiaomi_miwifi-r3`: `make info` lists every mt7620 device
-ImmortalWrt knows, but only this profile has the NAND support this
-project adds.
+A fresh `sysupgrade.bin` appears in `bin/targets/ramips/mt7620-nand/`
+in about a minute — flash it with "Keep settings" checked. The
+ImageBuilder offers exactly one profile, `xiaomi_miwifi-r3` (`make
+info` lists it), because this project builds its own `mt7620-nand`
+subtarget containing only this router.
 
 **B. Install directly, no reflash:** the ImageBuilder's `packages/`
 directory holds every `kmod-*.apk`; copy the one you need (plus any

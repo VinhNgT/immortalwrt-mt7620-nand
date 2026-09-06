@@ -46,7 +46,11 @@ fork as commits; the patch numbers map to commits as listed in
   in three copies. The fork's first build reproduced the predecessor's
   `v25.12.1-r1` kernel package version and manifest exactly; it was
   published as pre-release `v25.12.1-r1` without a new hardware boot
-  (no device at hand that day).
+  (no device at hand that day). Same day: the R3 moved into its own
+  `mt7620-nand` subtarget (the shape the 2022 upstream review asked
+  for), which also made the predecessor's "trim mt7620.mk to one
+  device" script unnecessary — the ImageBuilder now offers one
+  profile because the subtarget contains one device.
 
 ## Corrections — things that looked true and are wrong
 
