@@ -158,6 +158,60 @@ to the first subtarget.
 new Kconfig symbol is visible there, and an explicit "not set" keeps
 upstream's kernel-config refresh tooling from asking about it.
 
+## What differs from x-wrt — the audit
+
+The R3 support is meant to derive strictly from x-wrt, where the
+device is officially supported, with this project adding only its own
+fixes. This was audited on 2026-09-06 by computing x-wrt master's
+(`d5a9b94`, 2026-09-05) delta over OpenWrt master for the ramips
+target, base-files and uboot-envtools, and comparing it chunk by chunk
+with this tree. x-wrt touches exactly five files for the R3: the DTS,
+`image/mt7620.mk`, mt7620's `02_network` and `platform.sh`, and the
+uboot-envtools board list (plus the driver, its header and the
+Kconfig hook, which are not R3-specific). Nothing else in x-wrt's
+package or target tree mentions the device.
+
+Byte-identical to x-wrt: the driver source and header (before the
+ECC-report commit), the Kconfig hook patch, the DTS, the R3 image
+recipe, both `02_network` cases, the `platform.sh` case, and the
+uboot-envtools entry.
+
+What this project adds or decides on its own, in full:
+
+1. **The ECC-report commit** — this project's fix to the driver
+   (below).
+2. **The IB-feeds commit** — this project's ImageBuilder change
+   (below); nothing to do with x-wrt.
+3. **The `mt7620_nand` subtarget.** x-wrt enables `nand` and the UBI
+   options on the shared mt7620 subtarget and keeps the R3 cases
+   inside mt7620's base-files. This project moves the same content
+   into a separate subtarget because the 2022 upstream review asked
+   for that shape. Consequences that are ours: the subtarget's
+   `target.mk` text, the `# CONFIG_MTD_NAND_MT7620 is not set` line
+   in mt7620's config (x-wrt has that line in mt76x8 only, since its
+   mt7620 enables the driver), and the one-word subtarget list edit.
+4. **A subset of x-wrt's kernel config.** x-wrt adds about thirty
+   symbols to mt7620's kernel config. Sixteen of them are the NAND
+   driver, UBI, UBIFS and UBIFS's compression dependencies, and those
+   are what `subtarget-kconfig.fragment` carries. The rest are
+   x-wrt-wide choices unrelated to this device — BPF disabled,
+   pstore/ramoops with its Reed-Solomon dependency, a smaller log
+   buffer, MT753x/GSW150 switch options — and are deliberately not
+   taken. (The NAND driver does not use Reed-Solomon; pstore does.)
+5. **`nand.sh` adapted, not copied.** The dual-slot commit implements
+   x-wrt's `CI_KERNPART_EXT` logic line for line, but ImmortalWrt
+   25.12's `nand.sh` extracts the kernel with
+   `$cmd < "$tar_file" | tar xOf -` where x-wrt's base uses
+   `tar xO${gz}f "$tar_file"`, so the added lines follow the
+   surrounding code. x-wrt's unrelated extroot-erase additions to the
+   same file are not taken.
+
+Everything else — including two cosmetic divergences that had crept
+in while the port was a patch series (the spelling of the kernel size
+check and a reworded comment, both restored to x-wrt's text on
+2026-09-06 after verifying the size check behaves identically either
+way) — is x-wrt's work, attributed in the commit messages.
+
 ## The ECC-report commit — ECC corrections must reach MTD
 
 The stock driver detects and corrects single-bit ECC errors but
