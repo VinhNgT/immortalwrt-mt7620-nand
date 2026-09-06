@@ -29,5 +29,7 @@ through x-wrt's `nand.sh` extension, which this tree does not carry
 
 `mt7620-nand/scripts/check-xwrt-drift.sh` downloads the current x-wrt
 versions of the four files and compares their blob hashes against
-this table. Update the table (and the HEAD sha) whenever a sync brings
-new content in.
+this table, which it reads by column position — keep the table's
+shape. Update the table (and the HEAD sha) whenever a sync brings new
+content in; the procedure is in
+[DEVELOPMENT.md](DEVELOPMENT.md#syncing-from-x-wrt).
