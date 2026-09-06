@@ -2,7 +2,7 @@
 # Copyright (C) 2009 OpenWrt.org
 #
 
-SUBTARGET:=mt7620-nand
+SUBTARGET:=mt7620_nand
 BOARDNAME:=MT7620 based boards with NAND flash
 FEATURES+=usb ramdisk nand
 CPU_TYPE:=24kc
