@@ -4,7 +4,7 @@
 
 SUBTARGET:=mt7620_nand
 BOARDNAME:=MT7620 based boards with NAND flash
-FEATURES+=usb ramdisk nand
+FEATURES+=usb nand ramdisk
 CPU_TYPE:=24kc
 
 DEFAULT_PACKAGES += kmod-rt2800-soc wpad-openssl swconfig
