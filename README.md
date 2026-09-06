@@ -1,93 +1,93 @@
-<img src="https://avatars.githubusercontent.com/u/53193414?s=200&v=4" alt="logo" width="200" height="200" align="right">
+# ImmortalWrt for the Xiaomi Mi Router 3 (miwifi-r3)
 
-# Project ImmortalWrt
+> [!WARNING]
+> This project is vibe coded with Anthropic Claude Fable 5 — use at your own risk.
 
-ImmortalWrt is a fork of [OpenWrt](https://openwrt.org), with more packages ported, more devices supported, default optimized profiles and localization modifications for mainland China users.<br/>
-Compared to upstream, we allow to use (non-upstreamable) modifications/hacks to provide better feature/performance/support.
+Modern, maintained firmware for the Xiaomi Mi Router 3. Official
+OpenWrt dropped this device years ago because mainline Linux lost the
+driver for its NAND storage; this project keeps it alive on **current
+ImmortalWrt** by maintaining that driver and the device support as a
+short commit series on top of the ImmortalWrt release — with
+everything a user expects: LuCI web UI, current kernel, installable
+packages, and safe upgrades.
 
-Default login address: http://192.168.1.1 or http://immortalwrt.lan, username: __root__, password: _none_.
+This repository is a fork of
+[immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt).
+Branch `25.12` is the ImmortalWrt `v25.12.1` tag plus the port; the
+name refers to the `mt7620-nand` support it adds to the `ramips`
+target.
 
-## Download
-Built firmware images are available for many architectures and come with a package selection to be used as WiFi home router. To quickly find a factory image usable to migrate from a vendor stock firmware to ImmortalWrt, try the *Firmware Selector*.
+## Status
 
-- [ImmortalWrt Firmware Selector](https://firmware-selector.immortalwrt.org/)
+Complete, verified on real hardware.
 
-If your device is supported, please follow the **Info** link to see install instructions or consult the support resources listed below.
+- Everything works: WiFi (2.4 + 5 GHz), switch, USB, web UI, storage,
+  normal sysupgrade — on ImmortalWrt `v25.12.1` (kernel 6.12).
+- Installing never touches the bootloader, and every failure state
+  short of deliberately destroying the bootloader is recoverable.
+- The NAND driver's silent error-handling defect was fixed along the
+  way — flash bit-errors now heal themselves automatically.
 
-## Development
-To build your own firmware you need a GNU/Linux, BSD or macOS system (case sensitive filesystem required). Cygwin is unsupported because of the lack of a case sensitive file system.<br/>
+## Hardware
 
-  ### Requirements
-  To build with this project, Debian 11 is preferred. And you need use the CPU based on AMD64 architecture, with at least 4GB RAM and 25 GB available disk space. Make sure the __Internet__ is accessible.
+| | |
+|---|---|
+| SoC | MediaTek MT7620A @ 580 MHz (MIPS 24KEc, mipsel) |
+| RAM | 128 MiB DDR2 |
+| Flash | 128 MiB parallel NAND, ESMT F59L1G81LA |
+| WiFi | 2.4 GHz 802.11n (rt2800soc) + 5 GHz 802.11ac (MT7612E, mt76x2) |
+| Ethernet | 3× 100M (2 LAN, 1 WAN) |
+| USB | 1× USB 2.0 |
+| Serial | 115200 8N1, 3.3 V TTL |
 
-  The following tools are needed to compile ImmortalWrt, the package names vary between distributions.
+"R3" only — the 3G/3C/3A/3P are different devices and share nothing
+here.
 
-  - Here is an example for Debian/Ubuntu users:<br/>
-    - Method 1:
-      <details>
-        <summary>Setup dependencies via APT</summary>
+## Quick start
 
-        ```bash
-        sudo apt update -y
-        sudo apt full-upgrade -y
-        sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
-          g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
-          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
-          libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
-          ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
-          python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-          upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
-        ```
-      </details>
-    - Method 2:
-      ```bash
-      sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-      ```
+1. Download `…sysupgrade.bin` and `sha256sums` from the newest
+   [GitHub release](../../releases) and verify the checksum.
+2. If this is your first flash: **make a backup first** —
+   [mt7620-nand/docs/RECOVERY.md](mt7620-nand/docs/RECOVERY.md).
+3. Flash it from your current OpenWrt-family firmware's web UI
+   (settings **not** kept when switching firmware families) — full
+   steps in [mt7620-nand/docs/GUIDE.md](mt7620-nand/docs/GUIDE.md).
+4. The router comes back at `192.168.1.1` (user `root`, no password —
+   set one).
 
-  Note:
-  - Do everything as an unprivileged user, not root, without sudo.
-  - Using CPUs based on other architectures should be fine to compile ImmortalWrt, but more hacks are needed - No warranty at all.
-  - You must __not__ have spaces or non-ascii characters in PATH or in the work folders on the drive.
-  - If you're using Windows Subsystem for Linux (or WSL), removing Windows folders from PATH is required, please see [Build system setup WSL](https://openwrt.org/docs/guide-developer/build-system/wsl) documentation.
-  - Using macOS as the host build OS is __not__ recommended. No warranty at all. You can get tips from [Build system setup macOS](https://openwrt.org/docs/guide-developer/build-system/buildroot.exigence.macosx) documentation.
-  - For more details, please see [Build system setup](https://openwrt.org/docs/guide-developer/build-system/install-buildsystem) documentation.
+Adding packages later: ordinary packages install normally; kernel
+modules come from the release's bundled ImageBuilder — the guide
+covers both, plus the quirks worth knowing.
 
-  ### Quickstart
-  1. Run `git clone -b <branch> --single-branch --filter=blob:none https://github.com/immortalwrt/immortalwrt` to clone the source code.
-  2. Run `cd immortalwrt` to enter source directory.
-  3. Run `./scripts/feeds update -a` to obtain all the latest package definitions defined in feeds.conf / feeds.conf.default
-  4. Run `./scripts/feeds install -a` to install symlinks for all obtained packages into package/feeds/
-  5. Run `make menuconfig` to select your preferred configuration for the toolchain, target system & firmware packages.
-  6. Run `make` to build your firmware. This will download all sources, build the cross-compile toolchain and then cross-compile the GNU/Linux kernel & all chosen applications for your target system.
+## Documentation
 
-  ### Related Repositories
-  The main repository uses multiple sub-repositories to manage packages of different categories. All packages are installed via the OpenWrt package manager called opkg. If you're looking to develop the web interface or port packages to ImmortalWrt, please find the fitting repository below.
-  - [LuCI Web Interface](https://github.com/immortalwrt/luci): Modern and modular interface to control the device via a web browser.
-  - [ImmortalWrt Packages](https://github.com/immortalwrt/packages): Community repository of ported packages.
-  - [OpenWrt Routing](https://github.com/openwrt/routing): Packages specifically focused on (mesh) routing.
-  - [OpenWrt Video](https://github.com/openwrt/video): Packages specifically focused on display servers and clients (Xorg and Wayland).
+**For users:**
 
-## Support Information
-For a list of supported devices see the [OpenWrt Hardware Database](https://openwrt.org/supported_devices)
-  ### Documentation
-  - [Quick Start Guide](https://openwrt.org/docs/guide-quick-start/start)
-  - [User Guide](https://openwrt.org/docs/guide-user/start)
-  - [Developer Documentation](https://openwrt.org/docs/guide-developer/start)
-  - [Technical Reference](https://openwrt.org/docs/techref/start)
+- [mt7620-nand/docs/GUIDE.md](mt7620-nand/docs/GUIDE.md) — installing, upgrading, adding
+  packages, common use cases, quirks
+- [mt7620-nand/docs/RECOVERY.md](mt7620-nand/docs/RECOVERY.md) — backup, serial console, and
+  every path back from a bad flash
 
-  ### Support Community
-  - Support Chat: group [@ctcgfw_openwrt_discuss](https://t.me/ctcgfw_openwrt_discuss) on [Telegram](https://telegram.org/).
-  - Support Chat: group [#immortalwrt](https://matrix.to/#/#immortalwrt:matrix.org) on [Matrix](https://matrix.org/).
+**For developers** (how it works and why):
 
-## License
-ImmortalWrt is licensed under [GPL-2.0-only](https://spdx.org/licenses/GPL-2.0-only.html).
+- [mt7620-nand/docs/DEVELOPMENT.md](mt7620-nand/docs/DEVELOPMENT.md) — repo structure,
+  building, testing, cutting releases, following upstream
+- [mt7620-nand/docs/PORT-NOTES.md](mt7620-nand/docs/PORT-NOTES.md) — technical reference:
+  the NAND driver, what the port changes, the fixes made here
+- [mt7620-nand/docs/PROVENANCE.md](mt7620-nand/docs/PROVENANCE.md) — where the X-Wrt-derived
+  files came from, by content hash
+- [mt7620-nand/docs/RESEARCH-LOG.md](mt7620-nand/docs/RESEARCH-LOG.md) — how the conclusions
+  were reached, dead ends included
 
-## Acknowledgements
-<table>
-  <tr>
-    <td><a href="https://dlercloud.com/"><img src="https://user-images.githubusercontent.com/22235437/111103249-f9ec6e00-8588-11eb-9bfc-67cc55574555.png" width="183" height="52" border="0" alt="Dler Cloud"></a></td>
-    <td><a href="https://www.jetbrains.com/"><img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_square.png" width="120" height="120" border="0" alt="JetBrains Black Box Logo logo"></a></td>
-    <td><a href="https://sourceforge.net/"><img src="https://sourceforge.net/sflogo.php?type=17&group_id=3663829" alt="SourceForge" width=200></a></td>
-  </tr>
-</table>
+The port was first developed in
+[VinhNgT/immortalwrt-miwifi-r3](https://github.com/VinhNgT/immortalwrt-miwifi-r3)
+as a patch series applied to upstream checkouts; that repository is
+archived and this fork supersedes it.
+
+## Credits & license
+
+The NAND driver and original device support are by Chen Minqiang
+([x-wrt](https://github.com/x-wrt/x-wrt)); this repo forward-ports
+that work onto ImmortalWrt and adds fixes of its own. Licensed
+GPL-2.0, like the OpenWrt code it derives from (see
+[COPYING](COPYING) and [LICENSES/](LICENSES/)).
