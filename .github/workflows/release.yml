@@ -254,7 +254,7 @@ jobs:
             if [ -n "$pre" ]; then
               echo "> [!WARNING]"
               echo "> **Pre-release — not verified on hardware.** $pre"
-              echo "> Prefer the newest non-pre-release build unless you can recover the device yourself (see docs/RECOVERY.md)."
+              echo "> Prefer the newest non-pre-release build unless you can recover the device yourself (see mt7620-nand/docs/RECOVERY.md)."
               echo
             fi
             echo "ImmortalWrt \`$BASE_REF\` (upstream commit \`$BASE_SHA\`) for the Xiaomi Mi Router 3,"
