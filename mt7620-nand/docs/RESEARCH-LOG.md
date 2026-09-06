@@ -18,7 +18,7 @@ Entries dated before 09-06 describe the predecessor repository,
 onto a fresh upstream checkout in CI. "The installer" and "the apply
 script" below mean that script. On 09-06 the port moved into this
 fork as commits; the patch numbers map to commits as listed in
-[PORT-NOTES.md](PORT-NOTES.md#the-port--13-touch-points).
+[PORT-NOTES.md](PORT-NOTES.md#the-port--12-touch-points).
 
 ## Timeline
 
@@ -51,6 +51,29 @@ fork as commits; the patch numbers map to commits as listed in
   for), which also made the predecessor's "trim mt7620.mk to one
   device" script unnecessary — the ImageBuilder now offers one
   profile because the subtarget contains one device.
+- **09-06, later** — footprint audit, prompted by the question whether
+  the port could stay surgical instead of importing x-wrt wholesale.
+  Findings: NAND is the only thing keeping the R3 out of ImmortalWrt
+  (every other node in its DTS is upstream-supported and was
+  hardware-verified); x-wrt's whole ramips delta over OpenWrt main was
+  re-listed and nothing beyond the known files is R3-related; of the
+  port's shared-file touches, `nand.sh` was the only one upstream's
+  `openwrt-25.12` branch had changed since `v25.12.1` (156 commits on
+  by then; the AP-325 `CI_DATA_UBIPART` series, in the same function —
+  a three-way merge was still clean); and the NATCAP → `kernel0_rsvd`
+  detection line in the R3's `platform.sh` is dead code (no x-wrt DTS
+  defines that partition). ImmortalWrt's own `openwrt-18.06-k5.4`
+  branch (dormant since 2023-03-09; the R3 is absent from 21.02
+  onward) had carried Chen Minqiang's 2017 driver and device commits
+  since 2020: that driver differs from x-wrt's 2026 copy by 39
+  cosmetic lines (static qualifiers, 6.12 remove() guards), its DTS
+  uses removed bindings, and its `platform.sh` set `CI_KERNPART_EXT`
+  for breed while its `nand.sh` never learned the variable — the exact
+  decorative failure this project had identified. Decision: smaller
+  footprint. The second-slot write moved into `platform.sh` (ipq806x's
+  Xiaomi upgrade is the upstream precedent), upstream's `nand.sh` was
+  restored, the dead line dropped. Cost accepted: `platform.sh` is no
+  longer byte-identical to x-wrt's case.
 
 ## Corrections — things that looked true and are wrong
 
@@ -104,8 +127,9 @@ Read before re-researching anything.
   commit surfaced `02_network` (switch/MACs) and the uboot-envtools
   entry — without them the port would have had wrong network config
   and no fw_printenv. An eleventh (`nand.sh` CI_KERNPART_EXT) surfaced
-  during the pb-boot safety research. Lesson: diff against the real
-  upstream commit, not a mental model of it.
+  during the pb-boot safety research (since 09-06 done inside
+  `platform.sh` instead; see the timeline). Lesson: diff against the
+  real upstream commit, not a mental model of it.
 
 ## The ECC investigation (the ECC-report commit)
 
@@ -273,7 +297,8 @@ permanently. The record, in case this is ever revisited:
   exist in the binary — likely a full NAND dump over HTTP (never
   confirmed live). x-wrt commit `5c410e0095` ("sysupgrade compatable
   with breed") and issue #394 document the stale-slot failure that
-  the dual-slot commit prevents; issue #409 shows an R3 flipping between
+  the second-slot write in `platform.sh` prevents; issue #409 shows an
+  R3 flipping between
   PandoraBox and X-Wrt routinely; per ptpt52 in #404, returning to
   stock Xiaomi firmware is not supported from this ecosystem.
 - **Residual unknowns:** whether recovery erases the whole

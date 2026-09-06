@@ -179,10 +179,10 @@ behavior, residual unknowns) is in
 Facts that matter even without installing it:
 
 - pb-boot/breed always boot `kernel_stock` (mtd7), ignoring Xiaomi's
-  A/B flags. This project's sysupgrade handles that: the dual-slot commit
-  (`CI_KERNPART_EXT`) makes it write the kernel to **both** slots
-  when it detects such a bootloader on mtd0 — a guarded no-op under
-  stock U-Boot, kept for any R3 owner who does run pb-boot/breed.
+  A/B flags. This project's sysupgrade handles that: it writes the
+  kernel to **both** slots when it detects such a bootloader on mtd0 —
+  a no-op under stock U-Boot, kept for any R3 owner who does run
+  pb-boot/breed.
 - The community image circulates as
   `pb-boot-xiaomi3-20181021-fd6329c.img` (138,852 B, md5
   `87c79881406cafa47853c734c76e1141`, sha256
@@ -193,9 +193,10 @@ Facts that matter even without installing it:
 **If ever installing — the safe sequence** (each step gated on the
 last):
 
-1. Only from a running ImmortalWrt built **with the dual-slot commit** —
-   without it, every sysupgrade under pb-boot leaves the booted slot
-   stale.
+1. Only from a running ImmortalWrt built by this project (every
+   release qualifies): its sysupgrade writes both slots under pb-boot.
+   A build without that logic leaves the booted slot stale after every
+   sysupgrade.
 2. Pre-stage slot 0 so pb-boot has something to boot:
    `mtd write kernel1.bin kernel_stock`, then verify the read-back.
 3. Serial attached, stable power: U-Boot menu option `9`, send the

@@ -19,9 +19,15 @@ v25.12.1 (upstream)
   ├─ base-files: nand: support writing the kernel to a …    │ (PORT-NOTES.md)
   ├─ ramips: ralink_nand: report corrected bitflips so …    │
   ├─ imagebuilder: list remote userland feeds in …          │
-  ├─ ramips: add mt7620-nand subtarget and move the …       ┘
+  ├─ ramips: add mt7620-nand subtarget and move the …       │
+  ├─ ramips: mt7620_nand: write the second kernel slot …    ┘
   └─ mt7620-nand: project files (this doc, seed, CI, …)     project folder
 ```
+
+The `base-files: nand:` commit and the second-kernel-slot commit cancel
+out on `package/base-files`: the latter moved that logic into the
+subtarget's `platform.sh` and restored upstream's `nand.sh`. Squash the
+pair at the next rebase if a cleaner series is wanted.
 
 `git log v25.12.1..25.12` shows exactly what the port is; GitHub's
 compare view between the upstream tag and the branch is the

@@ -20,9 +20,12 @@ commit on top of the x-wrt content, so its current blob hash differs
 from the one above by exactly that commit
 (`git log --oneline -- target/linux/ramips/files/drivers/mtd/maps/ralink_nand.c`).
 
-The image recipe, `platform.sh`, `02_network`, uboot-envtools entry
-and the dual-slot `nand.sh` extension were ported by hand from x-wrt
-commit `f4fc1766f08a` and follow-ups (author Chen Minqiang).
+The image recipe, `02_network` and the uboot-envtools entry were
+ported by hand from x-wrt commit `f4fc1766f08a` and follow-ups (author
+Chen Minqiang). `platform.sh` takes its bootloader detection from the
+same source but writes the second kernel slot itself rather than
+through x-wrt's `nand.sh` extension, which this tree does not carry
+(see [PORT-NOTES.md](PORT-NOTES.md#what-differs-from-x-wrt--the-audit)).
 
 `mt7620-nand/scripts/check-xwrt-drift.sh` downloads the current x-wrt
 versions of the four files and compares their blob hashes against

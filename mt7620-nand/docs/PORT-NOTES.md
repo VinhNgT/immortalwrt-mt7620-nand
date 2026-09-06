@@ -82,12 +82,12 @@ The register windows MT7621 uses are marked *Reserved* on MT7620.
 None of the 1,344 mt7621 driver lines transfer; only `mtk_bmt` is
 controller-independent.
 
-## The port — 13 touch points
+## The port — 12 touch points
 
 The port is the commit series on branch `25.12` on top of the
 ImmortalWrt tag `v25.12.1` (see `git log v25.12.1..`). Touch points
-1–11 derive from x-wrt commits `387988e8c956` (driver) and
-`f4fc1766f08a` + follow-ups (device), author Chen Minqiang; 12 and 13
+1–10 derive from x-wrt commits `387988e8c956` (driver) and
+`f4fc1766f08a` + follow-ups (device), author Chen Minqiang; 11 and 12
 are this project's own fixes. The commits and the short names the
 docs use for them:
 
@@ -95,10 +95,16 @@ docs use for them:
 |---|---|---|
 | driver | `ramips: add mt7620-nand driver for NAND flash` | 1–3, 6, 7 |
 | device | `ramips: add Xiaomi Mi Router R3 support` | 4, 5, 8–10 |
-| dual-slot | `base-files: nand: support writing the kernel to a second partition` | 11 |
-| ECC-report | `ramips: ralink_nand: report corrected bitflips so UBI can scrub` | 12 |
-| IB-feeds | `imagebuilder: list remote userland feeds in standalone apk builds` | 13 |
+| ECC-report | `ramips: ralink_nand: report corrected bitflips so UBI can scrub` | 11 |
+| IB-feeds | `imagebuilder: list remote userland feeds in standalone apk builds` | 12 |
 | subtarget | `ramips: add mt7620-nand subtarget and move the Xiaomi Mi Router R3 to it` | 5–9 moved into `mt7620-nand/` |
+| second-slot | `ramips: mt7620_nand: write the second kernel slot from platform.sh` | 8 |
+
+The series also contains `base-files: nand: support writing the kernel
+to a second partition`, which put the second-slot write into the shared
+`nand.sh` the way x-wrt does; the second-slot commit moved it into
+`platform.sh` and restored upstream's `nand.sh`, so the net diff no
+longer touches `package/base-files`.
 
 The subtarget commit (2026-09-06) is the shape the upstream reviewer
 asked for (below): everything device-specific lives in
@@ -132,7 +138,14 @@ to the first subtarget.
    upstream's `scripts/kconfig.pl`, and CI fails if the committed file
    drifts from that merge
 8. `mt7620_nand/base-files/lib/upgrade/platform.sh` — nand sysupgrade
-   with bootloader/slot detection (only this subtarget's boards)
+   (only this subtarget's boards). Before the standard `nand_do_upgrade`
+   it runs x-wrt's bootloader detection — breed or pb-boot on mtd0, or
+   an X-Wrt kernel already in the first slot — and if it matches writes
+   the kernel to `kernel_stock` as well, so the slot those bootloaders
+   boot never goes stale (the second-slot commit; the pattern upstream
+   uses for the ipq806x Xiaomi routers). x-wrt does that extra write
+   inside its patched `nand.sh` instead; this tree leaves upstream's
+   `nand.sh` untouched
 9. `mt7620_nand/base-files/etc/board.d/02_network` — switch ports
    (`1:lan 4:lan 0:wan 6@eth0`) + MACs from the `factory` partition
    at offset 0x28 (only this subtarget's boards; mt7620's other
@@ -141,16 +154,9 @@ to the first subtarget.
 10. `package/boot/uboot-tools/uboot-envtools/files/ramips` —
     fw_printenv config (env on mtd1, offset 0x0, size 0x1000, sector
     0x20000)
-11. `package/base-files/files/lib/upgrade/nand.sh` —
-    `CI_KERNPART_EXT` support (the dual-slot commit): platform.sh's
-    breed/pb-boot detection sets this variable so sysupgrade writes
-    the kernel to **both** slots; it is an x-wrt extension that stock
-    ImmortalWrt ignores, so without this patch the detection would be
-    decorative and sysupgrade under breed/pb-boot would leave the
-    booted slot stale. A guarded no-op under stock U-Boot.
-12. `files/drivers/mtd/maps/ralink_nand.c` — ECC bitflip reporting
+11. `files/drivers/mtd/maps/ralink_nand.c` — ECC bitflip reporting
     (the ECC-report commit, ours — below)
-13. `target/imagebuilder/Makefile` — userland feeds in the standalone
+12. `target/imagebuilder/Makefile` — userland feeds in the standalone
     apk ImageBuilder (the IB-feeds commit, ours — below)
 
 `mt7620/config-<kv>` and `mt76x8/config-<kv>` additionally carry
@@ -168,13 +174,16 @@ target, base-files and uboot-envtools, and comparing it chunk by chunk
 with this tree. x-wrt touches exactly five files for the R3: the DTS,
 `image/mt7620.mk`, mt7620's `02_network` and `platform.sh`, and the
 uboot-envtools board list (plus the driver, its header and the
-Kconfig hook, which are not R3-specific). Nothing else in x-wrt's
-package or target tree mentions the device.
+Kconfig hook, which are not R3-specific, and a `CI_KERNPART_EXT`
+extension to the shared `nand.sh` that the R3's `platform.sh` uses).
+Nothing else in x-wrt's package or target tree mentions the device;
+x-wrt's other changes to shared ramips files (ramoops in the SoC
+dtsi, its switch drivers and boards) were re-checked on 2026-09-06
+and none is R3-related.
 
 Byte-identical to x-wrt: the driver source and header (before the
 ECC-report commit), the Kconfig hook patch, the DTS, the R3 image
-recipe, both `02_network` cases, the `platform.sh` case, and the
-uboot-envtools entry.
+recipe, both `02_network` cases, and the uboot-envtools entry.
 
 What this project adds or decides on its own, in full:
 
@@ -198,13 +207,25 @@ What this project adds or decides on its own, in full:
    pstore/ramoops with its Reed-Solomon dependency, a smaller log
    buffer, MT753x/GSW150 switch options — and are deliberately not
    taken. (The NAND driver does not use Reed-Solomon; pstore does.)
-5. **`nand.sh` adapted, not copied.** The dual-slot commit implements
-   x-wrt's `CI_KERNPART_EXT` logic line for line, but ImmortalWrt
-   25.12's `nand.sh` extracts the kernel with
-   `$cmd < "$tar_file" | tar xOf -` where x-wrt's base uses
-   `tar xO${gz}f "$tar_file"`, so the added lines follow the
-   surrounding code. x-wrt's unrelated extroot-erase additions to the
-   same file are not taken.
+5. **The second kernel slot is written from `platform.sh`, not
+   `nand.sh`.** x-wrt patches the shared `nand.sh` with a
+   `CI_KERNPART_EXT` variable and has the R3's `platform.sh` set it.
+   Until 2026-09-06 this tree carried that extension too (the
+   `base-files: nand:` commit in the series); the second-slot commit
+   then moved the write into the R3's own `platform.sh` — it runs
+   x-wrt's detection and writes the kernel to `kernel_stock` itself
+   before calling `nand_do_upgrade`, as upstream does for the ipq806x
+   Xiaomi routers — and restored upstream's `nand.sh`. Reasons: it
+   keeps the port inside its own subtarget, and `nand.sh` was the one
+   shared file the port touched that upstream's `openwrt-25.12` branch
+   had already changed since the release tag (in the same function).
+   Two deliberate differences from x-wrt's `platform.sh` case: the
+   detection line that picked a `kernel0_rsvd` partition on finding a
+   NATCAP kernel is dropped, because no x-wrt device tree defines that
+   partition; and a failed write of the second slot aborts the upgrade
+   before the UBI is touched instead of being ignored. x-wrt's
+   unrelated extroot-erase additions to `nand.sh` are not taken
+   either.
 
 Everything else — including two cosmetic divergences that had crept
 in while the port was a patch series (the spelling of the kernel size
@@ -310,12 +331,14 @@ line is maintained here.
 - `breed-factory.bin` — kernel **twice** (each padded to 4 MiB) + UBI
   — populates both kernel slots at once
 
-Slot logic (from `platform.sh` + the dual-slot commit): the R3 has two
+Slot logic (`platform.sh`): the R3 has two
 4 MiB kernel slots, `kernel_stock` (mtd7, at 0x200000) and `kernel`
 (mtd8, at 0x600000), sharing one UBI. Stock U-Boot honors Xiaomi's
 A/B flag and boots mtd8 on ported units; pb-boot/breed always boot
 mtd7. sysupgrade detects which bootloader is on mtd0 and writes the
-kernel to the slot(s) that bootloader will actually read.
+kernel to the slot(s) that bootloader will actually read: the
+`kernel_stock` copy first, then the standard nand upgrade (`kernel`
+and the UBI).
 
 ## Upstreaming outlook
 
