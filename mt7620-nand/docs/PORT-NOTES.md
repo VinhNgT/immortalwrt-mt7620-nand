@@ -166,9 +166,12 @@ upstream's kernel-config refresh tooling from asking about it.
 
 ## What differs from x-wrt — the audit
 
-The R3 support is meant to derive strictly from x-wrt, where the
-device is officially supported, with this project adding only its own
-fixes. This was audited on 2026-09-06 by computing x-wrt master's
+The R3 support derives from x-wrt, where the device is officially
+supported, but takes only what the R3 needs and follows ImmortalWrt's
+conventions where the two disagree (the rule is stated in
+[DEVELOPMENT.md](DEVELOPMENT.md#scope)); everything taken is listed
+here, and everything this project adds or decides on its own is
+listed below it. This was audited on 2026-09-06 by computing x-wrt master's
 (`d5a9b94`, 2026-09-05) delta over OpenWrt master for the ramips
 target, base-files and uboot-envtools, and comparing it chunk by chunk
 with this tree. x-wrt touches exactly five files for the R3: the DTS,

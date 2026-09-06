@@ -1,9 +1,47 @@
 # Development guide
 
-How this repository is structured, and how to build, test, release,
-and follow upstream. What the port changes and why:
+What this fork is for, how it is structured, and how to build, test,
+release, and follow upstream. What the port changes and why:
 [PORT-NOTES.md](PORT-NOTES.md). How the conclusions were reached
 (dead ends included): [RESEARCH-LOG.md](RESEARCH-LOG.md).
+
+## Scope
+
+The fork exists for exactly these things; a change that serves none
+of them does not belong here:
+
+1. **mt7620-nand support** as the `mt7620_nand` subtarget of `ramips`
+   — only the Xiaomi Mi Router R3 for now.
+2. **Fix the NAND driver's ECC reporting** so UBI can scrub bitflips.
+3. **A local-only-kmod ImageBuilder**: every kernel module built and
+   bundled with each release, userland packages from the official
+   feeds.
+4. **A CI release workflow**: a tag push builds and publishes a
+   release; a manual run is a test build.
+5. **Documentation**: research notes, user guides and this project's
+   own README, kept under `mt7620-nand/`.
+6. **A local containerized build** for a Windows host
+   (`mt7620-nand/build.ps1`).
+7. **Tracking x-wrt as the driver's source**: provenance by content
+   hash and a drift check.
+8. **LuCI in the images**, as in ImmortalWrt's official releases.
+9. **Device-private data kept out of the repository**
+   (`mt7620-nand/PRIVATE-NOTES.md` is git-ignored).
+
+Two rules follow from this being a fork of ImmortalWrt, not of x-wrt:
+
+- **Take the minimum from x-wrt.** x-wrt is where the R3 is officially
+  supported and is the source of the driver, the device tree and the
+  device support — but only what the R3 needs is taken, piece by
+  piece, each piece accounted for in [PORT-NOTES.md](PORT-NOTES.md).
+  x-wrt carries a large stack of unrelated changes on top of OpenWrt;
+  bringing it over wholesale would make this tree incoherent.
+- **Follow ImmortalWrt's conventions, not x-wrt's.** Where the two
+  disagree — where a file lives, how a subtarget is shaped, how
+  sysupgrade writes a partition — the ImmortalWrt/OpenWrt way wins,
+  even when that means diverging from x-wrt's text. The `mt7620_nand`
+  subtarget and the second-kernel-slot write in `platform.sh` are both
+  results of this rule.
 
 ## How the repository is structured
 
@@ -210,9 +248,10 @@ sh mt7620-nand/scripts/check-xwrt-drift.sh
 to download the current x-wrt versions of the four ported files and
 compare them against the blob hashes in
 [PROVENANCE.md](PROVENANCE.md). If something changed, the script
-prints a diff against the tree; port what is relevant as a new
-commit, re-apply the ECC-report change if the driver was touched,
-and update PROVENANCE.md with the new HEAD sha and hashes. x-wrt
+prints a diff against the tree; port only what the R3 needs, as a new
+commit that says what was left out and why, re-apply the ECC-report
+change if the driver was touched, and update PROVENANCE.md with the
+new HEAD sha and hashes. x-wrt
 tracks OpenWrt master (kernel 6.18 as of 2026-09), so a cherry-pick
 would not apply cleanly onto a release branch anyway — hand-porting
 is the honest form.
