@@ -268,7 +268,7 @@ permanently. The record, in case this is ever revisited:
   192.168.1.1. Breed-style `/fullflash.bin` + `/eeprom.bin` endpoints
   exist in the binary — likely a full NAND dump over HTTP (never
   confirmed live). x-wrt commit `5c410e0095` ("sysupgrade compatable
-  with breed") and issue #394 document the stale-slot failure our
+  with breed") and issue #394 document the stale-slot failure that
   the dual-slot commit prevents; issue #409 shows an R3 flipping between
   PandoraBox and X-Wrt routinely; per ptpt52 in #404, returning to
   stock Xiaomi firmware is not supported from this ecosystem.
