@@ -1,0 +1,24 @@
+# ImmortalWrt build seed for Xiaomi Mi Router 3 (miwifi-r3)
+# Expand with: cp config.seed .config && make defconfig
+CONFIG_TARGET_ramips=y
+CONFIG_TARGET_ramips_mt7620=y
+CONFIG_TARGET_ramips_mt7620_DEVICE_xiaomi_miwifi-r3=y
+CONFIG_PACKAGE_luci=y
+# Build every kernel module as a package (saturates vermagic: adding a kmod
+# later no longer changes the kernel, so modules stay installable per build)
+CONFIG_ALL_KMODS=y
+# Produce an ImageBuilder: prebuilt kernel + all packages, assembles custom
+# images for this device in ~1 min without a toolchain
+CONFIG_IB=y
+# Compiler cache — CI persists .ccache/ across runs. The CCACHE option's
+# Kconfig prompt is gated behind DEVEL ("Advanced configuration options"):
+# without DEVEL=y, `make defconfig` silently DROPS CCACHE=y. The CI
+# Configure step greps the expanded .config to catch that class of silent
+# drop.
+CONFIG_DEVEL=y
+CONFIG_CCACHE=y
+# Per-package build logs under logs/ — CI uploads them when a build fails
+CONFIG_BUILD_LOG=y
+# The 25.12 release repo publishes no video feed; =m keeps its URL commented
+# out in the ImageBuilder/router feed lists instead of 404ing on every update
+CONFIG_FEED_video=m
