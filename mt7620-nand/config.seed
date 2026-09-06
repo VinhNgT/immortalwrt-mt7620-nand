@@ -1,8 +1,8 @@
 # ImmortalWrt build seed for Xiaomi Mi Router 3 (miwifi-r3)
 # Expand with: cp config.seed .config && make defconfig
 CONFIG_TARGET_ramips=y
-CONFIG_TARGET_ramips_mt7620=y
-CONFIG_TARGET_ramips_mt7620_DEVICE_xiaomi_miwifi-r3=y
+CONFIG_TARGET_ramips_mt7620-nand=y
+CONFIG_TARGET_ramips_mt7620-nand_DEVICE_xiaomi_miwifi-r3=y
 CONFIG_PACKAGE_luci=y
 # Build every kernel module as a package (saturates vermagic: adding a kmod
 # later no longer changes the kernel, so modules stay installable per build)
