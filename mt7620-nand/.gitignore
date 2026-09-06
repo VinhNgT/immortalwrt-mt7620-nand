@@ -1,2 +1,3 @@
-# local build output - never commit
+# device-private runbook data and local build output - never commit
+PRIVATE-NOTES.md
 out/
