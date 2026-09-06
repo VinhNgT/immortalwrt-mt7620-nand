@@ -7,7 +7,7 @@ OTHER_MENU:=Other modules
 define KernelPackage/mmc-mtk
   SUBMENU:=Other modules
   TITLE:=MediaTek SD/MMC Card Interface support
-  DEPENDS:=@(TARGET_ramips_mt7620||TARGET_ramips_mt76x8||TARGET_ramips_mt7621) +kmod-mmc
+  DEPENDS:=@(TARGET_ramips_mt7620||TARGET_ramips_mt7620_nand||TARGET_ramips_mt76x8||TARGET_ramips_mt7621) +kmod-mmc
   KCONFIG:= \
 	CONFIG_MMC \
 	CONFIG_MMC_CQHCI \
@@ -50,7 +50,7 @@ define KernelPackage/sdhci-mt7620
   SUBMENU:=Other modules
   TITLE:=MT7620 SDCI
   CONFLICTS:=kmod-mmc-mtk
-  DEPENDS:=@(TARGET_ramips_mt7620||TARGET_ramips_mt76x8||TARGET_ramips_mt7621) +kmod-mmc
+  DEPENDS:=@(TARGET_ramips_mt7620||TARGET_ramips_mt7620_nand||TARGET_ramips_mt76x8||TARGET_ramips_mt7621) +kmod-mmc
   KCONFIG:= \
 	CONFIG_MTK_MMC \
 	CONFIG_MTK_AEE_KDUMP=n \

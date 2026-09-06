@@ -59,7 +59,7 @@ ifeq ($(strip $(SUBTARGET)),)
 $(error "Please specify a SUBTARGET!")
 endif
 
-ifeq ($(strip $(SUBTARGET)),mt7620)
+ifneq ($(filter mt7620 mt7620_nand,$(strip $(SUBTARGET))),)
 CFLAGS	+= -DSOC_MT7620
 endif
 
