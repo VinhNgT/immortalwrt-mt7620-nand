@@ -138,7 +138,13 @@ to the first subtarget.
    word), the `mmc-mtk`/`sdhci-mt7620` kmods, and the lzma loader's
    SoC selection. With these the subtarget is mt7620 plus NAND and
    nothing less, and the config sync script (touch point 7) fails if
-   a gate ever lacks the name. mt7620's other base-files need no
+   a gate ever lacks the name. A fourth place gates on the name in
+   composed form: the U-Boot builds for the two MT7620 evaluation
+   boards in `package/boot/uboot-mediatek` set `BUILD_SUBTARGET`,
+   which `include/u-boot.mk` turns into the symbol. Those boards are
+   not in this subtarget, so that gate is device-bound, stays as
+   upstream has it, and the sync script reports it as such rather
+   than failing. mt7620's other base-files need no
    copy: everything in them beyond the sysupgrade scaffolding is a
    per-board case list
 9. `mt7620_nand/base-files/lib/upgrade/platform.sh` — nand sysupgrade

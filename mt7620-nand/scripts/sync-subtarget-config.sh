@@ -23,6 +23,17 @@
 # so nothing else would notice; kmod-rt2800-soc, the SoC's 2.4 GHz
 # driver, is such a default package). Both modes list any gate that
 # lacks the name and exit 1; the fix is adding the name in the file shown.
+#
+# A gate can also be composed: a package sets BUILD_SUBTARGET:=mt7620 and
+# a shared include (include/u-boot.mk) glues that into the symbol
+# TARGET_ramips_mt7620 itself, so the literal symbol never appears in
+# the package and the grep above cannot see it. Composed gates are
+# reported, not failed: the only ones in the tree are the U-Boot builds
+# for the MT7620 evaluation boards, and such a gate is device-bound (the
+# package exists for the boards named in its BUILD_DEVICES), so a board
+# that is not in mt7620_nand owes nothing. The report says whether each
+# listed device is in image/mt7620_nand.mk; what to do with the answer
+# is a checklist step in DEVELOPMENT.md.
 set -eu
 
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
@@ -67,5 +78,38 @@ if [ -n "$gates" ]; then
 	status=1
 else
 	echo "every gate on the mt7620 subtarget name also names mt7620_nand"
+fi
+
+# Composed gates (see the header): BUILD_SUBTARGET set to mt7620. Listed
+# with the devices the package is bound to and whether each one has a
+# recipe in this subtarget; never a failure by itself.
+recipes="target/linux/ramips/image/mt7620_nand.mk"
+composed=$(grep -rlE --exclude-dir=.git \
+	'^[[:space:]]*BUILD_SUBTARGET[[:space:]]*[:?+]?=[[:space:]]*mt7620[[:space:]]*$' \
+	$dirs 2>/dev/null || true)
+if [ -n "$composed" ]; then
+	echo "note: composed gates on the mt7620 subtarget name (BUILD_SUBTARGET, which a shared"
+	echo "  include glues into TARGET_ramips_mt7620). Not a failure: a gate whose devices are"
+	echo "  all 'not in mt7620_nand' is device-bound and owes nothing - DEVELOPMENT.md, step 3:"
+	for f in $composed; do
+		awk -v f="$f" -v recipes="$recipes" '
+		/^define / { name = $2; devs = ""; hit = 0 }
+		/^[[:space:]]*BUILD_DEVICES[[:space:]]*[:?+]?=/ { devs = $0; sub(/^[^=]*=[[:space:]]*/, "", devs) }
+		/^[[:space:]]*BUILD_SUBTARGET[[:space:]]*[:?+]?=[[:space:]]*mt7620[[:space:]]*$/ {
+			if (name == "") printf "  %s:%d: BUILD_SUBTARGET mt7620 outside a define block - read it by hand\n", f, NR
+			else hit = 1
+		}
+		/^endef/ {
+			if (hit) {
+				n = split(devs, d, /[[:space:]]+/); out = ""
+				for (i = 1; i <= n; i++) if (d[i] != "") {
+					cmd = "grep -q \"^define Device/" d[i] "$\" " recipes
+					out = out (out == "" ? "" : ", ") d[i] ": " ((system(cmd) == 0) ? "in" : "not in") " mt7620_nand"
+				}
+				printf "  %s: %s -> %s\n", f, name, (out == "" ? "no BUILD_DEVICES - read it by hand" : out)
+			}
+			name = ""; hit = 0
+		}' "$f"
+	done
 fi
 exit $status
