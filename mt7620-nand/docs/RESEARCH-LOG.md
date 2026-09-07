@@ -105,6 +105,26 @@ fork as commits; the patch numbers map to commits as listed in
   commits on top of the series; DEVELOPMENT.md says so, and its
   fold/force-push recipe is for the occasions when a rewrite is
   decided, not a standing procedure.
+- **09-07, gate-scan blind spot** — comparing the fork with the
+  archived repository surfaced a gate the scan's grep cannot see:
+  `include/u-boot.mk` composes `TARGET_ramips_mt7620` from a package's
+  `BUILD_SUBTARGET`, so the literal symbol never appears in
+  `package/boot/uboot-mediatek/Makefile`. The only hits are the U-Boot
+  builds for the two MT7620 evaluation boards — device-bound, boards
+  not in `mt7620_nand`, nothing owed; making the subtarget variable
+  two-valued would mean editing the shared include for a bootloader
+  the R3 never writes. The rule was sharpened to gates that name the
+  subtarget as an SoC, and the scan now reports composed gates with
+  their devices for a judgment by hand instead of failing
+  (DEVELOPMENT.md, rebase step 3). Same day: the first CI build of the
+  gate-fixed tree reproduced the hardware-verified release's kernel
+  package version and package manifest exactly. The two earlier
+  subtarget test builds, made before the three literal gates were
+  fixed, had lacked all five rt2x00/rt2800 kmods and carried a
+  different kernel pin: the mmc kmods gated in `modules.mk` carry
+  kernel options, and under `ALL_KMODS` an unavailable kmod's options
+  drop out of the config hash. A changed pin is therefore also a
+  cheap sign of a missed gate.
 
 ## Corrections — things that looked true and are wrong
 
@@ -171,8 +191,10 @@ Read before re-researching anything.
   defconfig drops an unsatisfiable default package without a word.
   Found 09-06 by diffing everything keyed on `mt7620` against
   `mt7620_nand`; fixed in the subtarget commit, the config sync script
-  now lists any gate that lacks the name, and the CI and Docker builds
-  fail if either radio kmod is missing from the expanded `.config`.
+  now lists any literal gate that lacks the name (composed ones it
+  reports for a judgment by hand; timeline, 09-07), and the CI and
+  Docker builds fail if either radio kmod is missing from the expanded
+  `.config`.
   The package feeds (packages, luci, routing, telephony at
   25.12) gate nothing on the subtarget.
 

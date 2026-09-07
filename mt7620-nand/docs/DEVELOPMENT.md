@@ -48,11 +48,15 @@ A third rule follows from the subtarget: **`mt7620_nand` is mt7620
 plus NAND and nothing less.** Its kernel config is mt7620's plus one
 fragment, its target.mk differs from mt7620's only by the nand feature
 and its name, and every dependency gate that names the mt7620
-subtarget names `mt7620_nand` too. In ramips a subtarget name means an
-SoC, so a gate that forgets the second name silently makes a package
-unavailable there, and defconfig drops an unsatisfiable default
-package without a word, so nothing else would notice. How this was
-learned is in [RESEARCH-LOG.md](RESEARCH-LOG.md), under *Corrections*.
+subtarget as an SoC names `mt7620_nand` too. In ramips a subtarget
+name means an SoC, so a gate that forgets the second name silently
+makes a package unavailable there, and defconfig drops an
+unsatisfiable default package without a word, so nothing else would
+notice. A gate that is really a device's — a package that exists for
+boards named in its own recipe, such as the U-Boot builds for the two
+MT7620 evaluation boards — is mirrored by not existing, exactly as the
+other mt7620 device recipes are. How this was learned is in
+[RESEARCH-LOG.md](RESEARCH-LOG.md), under *Corrections*.
 
 ## How the repository is structured
 
@@ -91,7 +95,7 @@ elsewhere:
 | `mt7620-nand/config.seed` | build seed (target + device + LuCI + kmod/IB/ccache options, each explained inline) |
 | `mt7620-nand/scripts/tag-release.sh` | cuts a release: computes the next `<upstream>-rN`, tags HEAD, pushes |
 | `mt7620-nand/scripts/check-xwrt-drift.sh` | reports whether x-wrt master's versions of the four whole files taken from it changed; `--hunks` prints x-wrt's R3 lines from its shared files |
-| `mt7620-nand/scripts/sync-subtarget-config.sh`, `mt7620-nand/subtarget-kconfig.fragment` | regenerates (or, with `--check`, verifies) the mt7620_nand kernel config as mt7620's config plus the fragment, and lists any dependency gate on the mt7620 subtarget name that lacks `mt7620_nand` |
+| `mt7620-nand/scripts/sync-subtarget-config.sh`, `mt7620-nand/subtarget-kconfig.fragment` | regenerates (or, with `--check`, verifies) the mt7620_nand kernel config as mt7620's config plus the fragment, lists any dependency gate on the mt7620 subtarget name that lacks `mt7620_nand`, and reports composed gates (`BUILD_SUBTARGET`) for a judgment by hand |
 | `mt7620-nand/docker/`, `mt7620-nand/build.ps1` | local containerized build of the current checkout |
 | `mt7620-nand/docs/` | this documentation; `mt7620-nand/docs/boot-logs/` holds archived serial logs |
 | `mt7620-nand/.gitignore` | ignores `PRIVATE-NOTES.md` and `out/` inside the folder |
@@ -249,7 +253,8 @@ The authoritative documentation is the comments in
   `sync-subtarget-config.sh --check` verifies the mt7620_nand kernel
   config and scans the tree and the feeds for dependency gates that
   name mt7620 without `mt7620_nand`. It runs before the toolchain so
-  a drift fails in minutes.
+  a drift fails in minutes. Composed gates are printed as a note in
+  the same step, not failed (the table below says who judges them).
 - **Guards**: after `make defconfig`, the workflow greps the expanded
   `.config` for the device profile, `CCACHE`, `ALL_KMODS`, `IB`, and
   both radio kmods — defconfig silently drops symbols whose Kconfig
@@ -265,6 +270,7 @@ The authoritative documentation is the comments in
 |---|---|---|
 | mt7620_nand kernel config vs mt7620's plus the fragment | `sync-subtarget-config.sh` | every CI build; by hand after a rebase |
 | dependency gates on the mt7620 subtarget name | `sync-subtarget-config.sh` | same |
+| composed gates (`BUILD_SUBTARGET`) being device-bound | you, from the script's note | after every rebase |
 | default packages surviving defconfig (profile, both radios) | `release.yml`, `build-inside.sh` | every build |
 | the four whole files taken from x-wrt | `check-xwrt-drift.sh` | by hand, per the x-wrt procedure |
 | x-wrt's R3 hunks in its shared files | you, with `check-xwrt-drift.sh --hunks` | same |
@@ -305,6 +311,14 @@ April 2025 and April 2026. Example: `v25.12.1` → `v25.12.2`.
    It regenerates `target/linux/ramips/mt7620_nand/config-<kv>` from
    mt7620's new config and fails if any gate on the mt7620 subtarget
    name lacks `mt7620_nand`; add the name in the file it points at.
+   It also prints a note for every composed gate — a package whose
+   `BUILD_SUBTARGET` is mt7620, which a shared include glues into the
+   symbol — with the devices the package is bound to and whether each
+   has a recipe in `image/mt7620_nand.mk`. None in: the gate is a
+   device's and nothing is owed (the U-Boot builds for the two MT7620
+   evaluation boards are the only ones today). Any in: treat it like
+   the three literal gates and port the name, which for a composed
+   gate means the package or the include it uses.
    Commit the regenerated config and any gate edits; the rebase is
    already rewriting history, so folding them into the subtarget
    commit is reasonable but not required.
