@@ -195,10 +195,11 @@ page), picking the branch or commit to build and two boolean inputs:
   `sync-subtarget-config.sh --check`, and `Configure` defconfig guards
   (~2–3 minutes). Use this to catch rebase or config drift immediately.
 - **`prebuilt_toolchain`** (default `true`): hydrates
-  `staging_dir/toolchain-*` from ImmortalWrt's official
-  `immortalwrt-toolchain-<ver>-ramips-mt7620_*.tar.zst` instead of
-  compiling GCC/binutils/musl from scratch. Set to `false` to test a
-  full source toolchain build.
+  `staging_dir/toolchain-*` and `./llvm-bpf/` from ImmortalWrt's
+  official `immortalwrt-toolchain-<ver>-ramips-mt7620_*.tar.zst` and
+  `llvm-bpf-*.Linux-x86_64.tar.zst` tarballs instead of compiling
+  GCC/binutils/musl and LLVM/Clang from scratch. Set to `false` to
+  test full source builds of both toolchains.
 
 A full manual run builds `world`, smoke-tests the generated ImageBuilder
 (`make info` and `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`),
@@ -293,17 +294,25 @@ The authoritative documentation is the comments in
   silently drops symbols whose Kconfig prompt is hidden or disabled and
   packages whose dependencies are unsatisfied, and a silent drop should
   fail the run in minute two.
-- **Host tools + Prebuilt toolchain hydration**: `make tools/install`
-  builds host tools cleanly, then `Hydrate prebuilt toolchain` downloads
+- **Host tools + Prebuilt toolchain & LLVM-BPF hydration**: before
+  `Configure`, when `prebuilt_toolchain` is enabled, CI downloads
   ImmortalWrt's official SHA-256-verified
+  `llvm-bpf-*.Linux-x86_64.tar.zst` tarball into `./llvm-bpf/` so
+  `make defconfig` activates OpenWrt's native
+  `CONFIG_BPF_TOOLCHAIN_PREBUILT` (`CONFIG_USE_LLVM_PREBUILT=y`),
+  skipping ~55 minutes of compiling LLVM/Clang from source for `qosify`.
+  `make tools/install` then builds only the remaining host tools
+  (~10–14m), and `Hydrate prebuilt toolchain` downloads ImmortalWrt's
+  official SHA-256-verified
   `immortalwrt-toolchain-<ver>-ramips-mt7620_*.tar.zst` tarball (same
   `mipsel_24kc` musl ABI/GCC), places it into `staging_dir/toolchain-*`,
   unwraps `target/toolchain/Makefile`'s `*.bin` wrappers, runs
   `scripts/patch-specs.sh`, verifies `mipsel-openwrt-linux-musl-gcc
   --version`, and touches the toolchain stamps. This keeps `config.seed`
-  100% stock OpenWrt (no `EXTERNAL_TOOLCHAIN` patches) while skipping ~35
-  minutes of compiling GCC/binutils/musl. Setting `prebuilt_toolchain`
-  to `false` falls back to `make toolchain/install`.
+  100% stock OpenWrt (no `EXTERNAL_TOOLCHAIN` patches) while skipping ~90
+  minutes total of toolchain compiles. Setting `prebuilt_toolchain` to
+  `false` falls back to building both `llvm-bpf` and `toolchain/install`
+  from source.
 - **ImageBuilder smoke test**: after `make world`, CI unpacks the
   generated ImageBuilder, verifies `xiaomi_miwifi-r3` appears in
   `make info`, runs `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`,

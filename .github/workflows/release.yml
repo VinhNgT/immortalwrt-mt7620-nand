@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       prebuilt_toolchain:
-        description: "Hydrate staging_dir/toolchain-* from ImmortalWrt's official mt7620 toolchain tarball"
+        description: "Hydrate prebuilt mt7620 toolchain and llvm-bpf tarballs from ImmortalWrt"
         type: boolean
         default: true
 
@@ -102,7 +102,36 @@ jobs:
       - name: Check the subtarget is mt7620 plus NAND
         run: sh mt7620-nand/scripts/sync-subtarget-config.sh --check
 
+      # Hydrating ImmortalWrt's official SHA-256-verified llvm-bpf archive into
+      # ./llvm-bpf/ before Configure activates OpenWrt's native
+      # CONFIG_BPF_TOOLCHAIN_PREBUILT option and skips ~55m of compiling LLVM
+      # from source for qosify.
+      - name: Hydrate prebuilt LLVM-BPF toolchain
+        if: inputs.check_only != true && inputs.prebuilt_toolchain != false
+        run: |
+          set -euo pipefail
+          BASE_VER="${BASE_REF#v}"
+          BASE_URL="https://downloads.immortalwrt.org/releases/${BASE_VER}/targets/ramips/mt7620"
+
+          tmp_dir=$(mktemp -d)
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          curl -fsSL --retry 3 "$BASE_URL/sha256sums" | grep -E ' \*llvm-bpf-.*\.Linux-x86_64\.tar\.zst$' > "$tmp_dir/sha256sums"
+          [ -s "$tmp_dir/sha256sums" ] || { echo "ERROR: llvm-bpf tarball not found in $BASE_URL/sha256sums" >&2; exit 1; }
+          TARBALL=$(awk '{ sub(/^\*/, "", $2); print $2; exit }' "$tmp_dir/sha256sums")
+
+          curl -fsSL --retry 3 -o "$tmp_dir/$TARBALL" "$BASE_URL/$TARBALL"
+          (cd "$tmp_dir" && sha256sum -c sha256sums)
+
+          rm -rf llvm-bpf llvm-bpf-*.Linux-x86_64
+          tar -xf "$tmp_dir/$TARBALL" -C .
+          [ -f llvm-bpf/.llvm-version ] || { echo "ERROR: llvm-bpf/.llvm-version missing after extract" >&2; exit 1; }
+          cat llvm-bpf/.llvm-version
+          ./llvm-bpf/bin/clang --target=bpfel -dM -E - < /dev/null | grep __clang_major__
+
       - name: Configure
+        env:
+          EXPECT_PREBUILT_LLVM: ${{ inputs.check_only != true && inputs.prebuilt_toolchain != false }}
         run: |
           cp mt7620-nand/config.seed .config
           make defconfig
@@ -129,6 +158,16 @@ jobs:
               exit 1
             }
           done
+          if [ "$EXPECT_PREBUILT_LLVM" = "true" ]; then
+            grep -q "^CONFIG_USE_LLVM_PREBUILT=y$" .config || {
+              echo "ERROR: CONFIG_USE_LLVM_PREBUILT=y missing after defconfig" >&2
+              exit 1
+            }
+            if grep -q "^CONFIG_USE_LLVM_BUILD=y$" .config; then
+              echo "ERROR: CONFIG_USE_LLVM_BUILD=y still enabled despite prebuilt llvm-bpf" >&2
+              exit 1
+            fi
+          fi
 
       - name: Build host tools
         if: inputs.check_only != true
