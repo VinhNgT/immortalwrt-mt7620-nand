@@ -290,11 +290,12 @@ goes.
 Expect one every one to three months; the 24.10 line had six between
 April 2025 and April 2026. Example: `v25.12.2` → `v25.12.3`.
 
-1. Fetch and back up:
+1. Fetch, mirror the upstream tag, and back up:
 
    ```bash
    git remote add upstream https://github.com/immortalwrt/immortalwrt.git   # once
    git fetch upstream --tags
+   git push origin v25.12.3   # so CI's git describe resolves BASE_REF (does not trigger release.yml)
    git checkout 25.12
    git branch backup/25.12-pre-v25.12.3-$(date +%Y%m%d) && git push origin backup/25.12-pre-v25.12.3-$(date +%Y%m%d)
    ```
@@ -357,8 +358,9 @@ own commits, separate from port changes, as the series already does.
 Example: a `26.x` line on kernel 6.18. The old line's branch stays as
 it is; the new line gets its own branch, named after the line.
 
-1. `git fetch upstream --tags`, then
-   `git checkout -b 26.x v26.x.0`.
+1. `git fetch upstream --tags`,
+   `git push origin v26.x.0` (so CI's `git describe` resolves `BASE_REF`),
+   then `git checkout -b 26.x v26.x.0`.
 
 2. Bring the series over: `git cherry-pick v25.12.2..25.12`. Resolve
    conflicts as in the point-release procedure. Two conflicts are
