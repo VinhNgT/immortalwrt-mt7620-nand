@@ -1,7 +1,7 @@
-# Build this checkout for the Xiaomi Mi Router 3 in Docker.
+# Build the ramips/mt7620_nand ImageBuilder from this checkout in Docker.
 # The source tree + downloads live in a named volume (iwrt-src) so re-runs
 # are fast; the tree is fetched from this checkout, so the build is exactly
-# the local commit. Artifacts land in .\out\ next to this script.
+# the local commit. Artifacts land in .\mt7620-nand\out\.
 #
 # Usage:  .\mt7620-nand\build.ps1                (build HEAD)
 #         .\mt7620-nand\build.ps1 -Ref 25.12     (build a branch/commit of this checkout)

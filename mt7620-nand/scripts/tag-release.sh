@@ -65,7 +65,7 @@ last=$(git ls-remote --tags origin "refs/tags/${REF}-r*" \
 	| sort -n | tail -n1)
 TAG="${REF}-r$(( ${last:-0} + 1 ))"
 
-msg="ImmortalWrt $REF for Mi Router 3, port build $TAG"
+msg="ImmortalWrt $REF for ramips/mt7620_nand, port build $TAG"
 [ -z "$PRE" ] || msg="$msg
 
 Prerelease: $PRE"

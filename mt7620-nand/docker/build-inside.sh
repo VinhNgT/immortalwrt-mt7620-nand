@@ -28,15 +28,22 @@ echo "building $(git rev-parse --short HEAD): $(git log -1 --format=%s)"
 cp mt7620-nand/config.seed .config
 make defconfig
 
-# sanity: the device must have survived defconfig
-grep -q "CONFIG_TARGET_ramips_mt7620_nand_DEVICE_xiaomi_miwifi-r3=y" .config || {
-	echo "ERROR: xiaomi_miwifi-r3 profile missing after defconfig"
-	exit 1
-}
-# a default package whose dependency gate omits this subtarget is dropped
-# just as silently - both radios must have made it in
-for p in kmod-rt2800-soc kmod-mt76x2; do
-	grep -q "^CONFIG_PACKAGE_$p=y" .config || {
+# sanity: the subtarget, ImageBuilder, and key target packages must survive defconfig
+for sym in \
+	CONFIG_TARGET_ramips_mt7620_nand=y \
+	CONFIG_TARGET_MULTI_PROFILE=y \
+	CONFIG_ALL_NONSHARED=y \
+	CONFIG_ALL_KMODS=y \
+	CONFIG_IB=y \
+	CONFIG_IB_STANDALONE=y \
+	CONFIG_PACKAGE_kmod-rt2800-soc=y; do
+	grep -q "^${sym}$" .config || {
+		echo "ERROR: $sym missing after defconfig"
+		exit 1
+	}
+done
+for p in kmod-mt76x2 uboot-envtools; do
+	grep -qE "^CONFIG_PACKAGE_${p}=[ym]$" .config || {
 		echo "ERROR: $p missing after defconfig"
 		exit 1
 	}
@@ -45,8 +52,11 @@ done
 make -j"$(nproc)" download
 make -j"$(nproc)" world
 
-mkdir -p /repo/mt7620-nand/out
-cp -v bin/targets/ramips/mt7620_nand/*miwifi-r3* /repo/mt7620-nand/out/
-cp -v bin/targets/ramips/mt7620_nand/sha256sums /repo/mt7620-nand/out/ 2>/dev/null || true
-awk '$1 == "kernel" { print "kernel package: " $3 }' bin/targets/ramips/mt7620_nand/*.manifest | head -n1
-echo "DONE - images in mt7620-nand/out/"
+rm -rf /repo/mt7620-nand/out && mkdir -p /repo/mt7620-nand/out
+cp -v bin/targets/ramips/mt7620_nand/immortalwrt-imagebuilder-*.tar.* /repo/mt7620-nand/out/
+cp -v bin/targets/ramips/mt7620_nand/config.buildinfo /repo/mt7620-nand/out/
+cp -v bin/targets/ramips/mt7620_nand/feeds.buildinfo /repo/mt7620-nand/out/
+cp -v bin/targets/ramips/mt7620_nand/version.buildinfo /repo/mt7620-nand/out/
+(cd /repo/mt7620-nand/out && sha256sum * > sha256sums)
+echo "kernel package: $(head -n1 staging_dir/target-*/kernel.version)"
+echo "DONE - ImageBuilder in mt7620-nand/out/"

@@ -1,23 +1,23 @@
-# ImmortalWrt build seed for Xiaomi Mi Router 3 (miwifi-r3)
-# Expand with: cp config.seed .config && make defconfig
+# ImmortalWrt build seed for ramips/mt7620_nand (ImageBuilder-first subtarget build)
+# Expand with: cp mt7620-nand/config.seed .config && make defconfig
 CONFIG_TARGET_ramips=y
 CONFIG_TARGET_ramips_mt7620_nand=y
-CONFIG_TARGET_ramips_mt7620_nand_DEVICE_xiaomi_miwifi-r3=y
-CONFIG_PACKAGE_luci=y
-# Build every kernel module as a package (saturates vermagic: adding a kmod
-# later no longer changes the kernel, so modules stay installable per build)
-CONFIG_ALL_KMODS=y
-# Produce an ImageBuilder: prebuilt kernel + all packages, assembles custom
-# images for this device in ~1 min without a toolchain
+# Multi-profile with no device selected builds no per-device .bin images during
+# make world, while still building kernels/DTBs for every device in
+# target/linux/ramips/image/mt7620_nand.mk when CONFIG_IB=y.
+CONFIG_TARGET_MULTI_PROFILE=y
+# Build every kernel module (implies CONFIG_ALL_KMODS=y) and every
+# target-specific package (base-files, uboot-envtools, mtd, toolchain libs,
+# etc.) so the ImageBuilder has full local coverage for this exact kernel
+# vermagic.
+CONFIG_ALL_NONSHARED=y
+# Produce a standalone ImageBuilder: bundles all local kernel/kmod/target
+# packages and lists ImmortalWrt's remote mipsel_24kc userland feeds via our
+# target/imagebuilder/Makefile patch.
 CONFIG_IB=y
-# Compiler cache — CI persists .ccache/ across runs. The CCACHE option's
-# Kconfig prompt is gated behind DEVEL ("Advanced configuration options"):
-# without DEVEL=y, `make defconfig` silently DROPS CCACHE=y. The CI
-# Configure step greps the expanded .config to catch that class of silent
-# drop.
-CONFIG_DEVEL=y
-CONFIG_CCACHE=y
+CONFIG_IB_STANDALONE=y
 # Per-package build logs under logs/ — CI uploads them when a build fails
+CONFIG_DEVEL=y
 CONFIG_BUILD_LOG=y
 # The 25.12 release repo publishes no video feed; =m keeps its URL commented
 # out in the ImageBuilder/router feed lists instead of 404ing on every update
