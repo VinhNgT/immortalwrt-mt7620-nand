@@ -189,6 +189,7 @@ typedef enum _ra_flags {
 	FLAG_ECC_EN 	= (1<<0),
 	FLAG_USE_GDMA 	= (1<<1),
 	FLAG_VERIFY 	= (1<<2),
+	FLAG_MARK_BAD	= (1<<3),
 } RA_FLAGS;
 
 

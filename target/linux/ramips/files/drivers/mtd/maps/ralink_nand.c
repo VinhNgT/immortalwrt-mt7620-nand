@@ -113,9 +113,9 @@ static int nfc_all_reset(void)
 
 	retry = READ_STATUS_RETRY;
 	while ((ra_inl(NFC_INT_ST) & 0x02) != 0x02 && retry--);
-	if (retry <= 0) {
+	if (!(ra_inl(NFC_INT_ST) & 0x02)) {
 		printk("nfc_all_reset: clean buffer fail \n");
-		return -1;
+		return -EIO;
 	}
 
 	retry = READ_STATUS_RETRY;
@@ -123,9 +123,12 @@ static int nfc_all_reset(void)
 		udelay(1);
 	}
 
-	nfc_chip_reset();
+	if (ra_inl(NFC_STATUS) & 0x1) {
+		printk("nfc_all_reset: controller busy \n");
+		return -EIO;
+	}
 
-	return 0;
+	return nfc_chip_reset() ? -EIO : 0;
 }
 
 /** NOTICE: only called by nfc_wait_ready().
@@ -163,9 +166,9 @@ static int _nfc_read_status(char *status)
 	} while (!(int_st & INT_ST_RX_BUF_RDY) && retry--);
 
 	if (!(int_st & INT_ST_RX_BUF_RDY)) {
-		printk("nfc_read_status: NFC fail, int_st(%x), retry:%x. nfc:%x, reset nfc and flash. \n",
+		printk("nfc_read_status: NFC fail, int_st(%x), retry:%x. nfc:%x. \n",
 		       int_st, retry, nfc_st);
-		nfc_all_reset();
+		/* Reset also reads status; do not recurse on a persistent timeout. */
 		*status = NAND_STATUS_FAIL;
 		return -1;
 	}
@@ -846,6 +849,8 @@ ecc_check:
 					return -1;
 				}
 			}
+			if (mode == FL_READING)
+				return -EUCLEAN;
 		}
 
 	}
@@ -1004,6 +1009,8 @@ int nfc_read_page(struct ra_nand_chip *ra, char *buf, int page, int flags)
 	// verify and correct ecc
 	if ((flags & (FLAG_VERIFY | FLAG_ECC_EN)) == (FLAG_VERIFY | FLAG_ECC_EN)) {
 		status = nfc_ecc_verify(ra, buf, page, FL_READING);
+		if (status == -EUCLEAN)
+			return status;
 		if (status != 0) {
 			printk("%s: fail, buf:%x, page:%x, flag:%x\n",
 			       __func__, (unsigned int)buf, page, flags);
@@ -1036,7 +1043,8 @@ int nfc_write_page(struct ra_nand_chip *ra, char *buf, int page, int flags)
 	use_gdma = flags & FLAG_USE_GDMA;
 	ecc_en = flags & FLAG_ECC_EN;
 
-	oob[ra->badblockpos] = 0xff;	//tag as good block.
+	if (!(flags & FLAG_MARK_BAD))
+		oob[ra->badblockpos] = 0xff;	//tag as good block.
 	ra->buffers_page = -1; //cached
 
 	page = page & (CFG_CHIPSIZE-1); //chip boundary
@@ -1135,13 +1143,10 @@ static void nand_release_device(struct ra_nand_chip *ra)
 static int
 nand_get_device(struct ra_nand_chip *ra, int new_state)
 {
-	int ret = 0;
+	mutex_lock(ra->controller);
+	ra->state = new_state;
 
-	ret = mutex_lock_interruptible(ra->controller);
-	if (!ret)
-		ra->state = new_state;
-
-	return ret;
+	return 0;
 }
 
 /*************************************************************
@@ -1262,7 +1267,7 @@ static int nand_block_markbad(struct ra_nand_chip *ra, loff_t offs)
 	if (*ecc == (char)0x0ff) {
 		//tag into flash
 		*ecc = (char)tag;
-		ret = nfc_write_page(ra, ra->buffers, page, FLAG_USE_GDMA);
+		ret = nfc_write_page(ra, ra->buffers, page, FLAG_USE_GDMA | FLAG_MARK_BAD);
 		if (ret)
 			printk("%s: fail to write bad block tag \n", __func__);
 	}
@@ -1271,7 +1276,7 @@ tag_bbt:
 	//update bbt
 	ra_nand_bbt_set(ra, block, tag);
 
-	return 0;
+	return ret;
 }
 
 #if defined (WORKAROUND_RX_BUF_OV)
@@ -1578,7 +1583,9 @@ static int nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 		// oob write
 		if (ops->mode == MTD_OPS_AUTO_OOB) {
 			//fixme, this path is not yet varified
-			nfc_read_oob(ra, page, 0, ra->buffers + pagesize, oobsize, FLAG_NONE);
+			ret = nfc_read_oob(ra, page, 0, ra->buffers + pagesize, oobsize, FLAG_NONE);
+			if (ret)
+				return ret;
 		}
 		if (oob && ooblen > 0) {
 			len = nand_write_oob_buf(ra, ra->buffers + pagesize, oob, ooblen, ops->mode, ops->ooboffs);
@@ -1598,7 +1605,6 @@ static int nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 
 			data += len;
 			datalen -= len;
-			ops->retlen += len;
 
 			ecc_en = FLAG_ECC_EN;
 		}
@@ -1609,7 +1615,10 @@ static int nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 			return ret;
 		}
 
-		ra_nand_bbt_set(ra, addr >> ra->erase_shift, BBT_TAG_GOOD);
+		if (data && len > 0)
+			ops->retlen += len;
+
+		/* Successful I/O does not establish that the block marker is good. */
 
 		addr = (page+1) << ra->page_shift;
 
@@ -1630,6 +1639,7 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
                             struct mtd_oob_ops *ops)
 {
 	int page;
+	int ecc_status = 0;
 	uint32_t datalen = ops->len;
 	uint32_t ooblen = ops->ooblen;
 	uint8_t *oob = ops->oobbuf;
@@ -1665,12 +1675,12 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 		ret = nfc_read_page(ra, ra->buffers, page, FLAG_VERIFY |
 		                    ((ops->mode == MTD_OPS_RAW || ops->mode == MTD_OPS_PLACE_OOB) ? 0: FLAG_ECC_EN ));
 		//FIXME, something strange here, some page needs 2 more tries to guarantee read success.
-		if (ret) {
+		if (ret && ret != -EUCLEAN) {
 			printk("read again:\n");
 			ret = nfc_read_page(ra, ra->buffers, page, FLAG_VERIFY |
 			                    ((ops->mode == MTD_OPS_RAW || ops->mode == MTD_OPS_PLACE_OOB) ? 0: FLAG_ECC_EN ));
 
-			if (ret) {
+			if (ret && ret != -EUCLEAN) {
 				printk("read again fail \n");
 				ra_nand_bbt_set(ra, addr >> ra->erase_shift, BBT_TAG_BAD);
 				if ((ret != -EUCLEAN) && (ret != -EBADMSG)) {
@@ -1684,6 +1694,9 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 				printk(" read agian susccess \n");
 			}
 		}
+
+		if (ret == -EBADMSG || (ret == -EUCLEAN && !ecc_status))
+			ecc_status = ret;
 
 		// oob read
 		if (oob && ooblen > 0) {
@@ -1707,24 +1720,23 @@ static int nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 			data += len;
 			datalen -= len;
 			ops->retlen += len;
-			if (ret)
-				return ret;
 		}
 
 
-		ra_nand_bbt_set(ra, addr >> ra->erase_shift, BBT_TAG_GOOD);
+		/* Successful I/O does not establish that the block marker is good. */
 		// address go further to next page, instead of increasing of length of write. This avoids some special cases wrong.
 		addr = (page+1) << ra->page_shift;
 	}
 
-	if (ranfc_ecc_corrected) {
-		if (ranfc_mtd)
-			ranfc_mtd->ecc_stats.corrected += ranfc_ecc_corrected;
+	if (ranfc_ecc_corrected && ranfc_mtd)
+		ranfc_mtd->ecc_stats.corrected += ranfc_ecc_corrected;
+	if (ecc_status == -EBADMSG)
+		return -EBADMSG;
+	if (ecc_status == -EUCLEAN || ranfc_ecc_corrected)
 		/* max bitflips per ECC step: SW Hamming corrects at most 1, and a
 		 * corrected step is at its limit -> mtd core returns -EUCLEAN and
 		 * UBI scrubs the PEB */
 		return 1;
-	}
 	return 0;
 }
 
@@ -1759,6 +1771,10 @@ ramtd_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 	if (!len)
 		return 0;
+
+	if (!IS_ALIGNED(to, mtd->writesize) ||
+	    !IS_ALIGNED(len, mtd->writesize))
+		return -EINVAL;
 
 	nand_get_device(ra, FL_WRITING);
 
@@ -1845,10 +1861,17 @@ ramtd_nand_writeoob(struct mtd_info *mtd, loff_t to,
 static int
 ramtd_nand_block_isbad(struct mtd_info *mtd, loff_t offs)
 {
+	struct ra_nand_chip *ra = mtd->priv;
+	int ret;
+
 	if (offs > mtd->size)
 		return -EINVAL;
 
-	return nand_block_checkbad((struct ra_nand_chip *)mtd->priv, offs);
+	nand_get_device(ra, FL_READING);
+	ret = nand_block_checkbad(ra, offs);
+	nand_release_device(ra);
+
+	return ret;
 }
 
 static int
@@ -2035,7 +2058,12 @@ mtk_nand_probe(struct platform_device *pdev)
 	}
 #endif
 	ra_outl(NFC_CTRL, ra_inl(NFC_CTRL) | 0x01); //set wp to high
-	nfc_all_reset();
+	err = nfc_all_reset();
+	if (err) {
+		ranfc_mtd = NULL;
+		kfree(ra);
+		return err;
+	}
 
 	ranfc_mtd->type		= MTD_NANDFLASH;
 	ranfc_mtd->flags	= MTD_CAP_NANDFLASH;
@@ -2083,6 +2111,10 @@ mtk_nand_probe(struct platform_device *pdev)
 	mtd_set_of_node(ranfc_mtd, pdev->dev.of_node);
 	err = mtd_device_parse_register(ranfc_mtd, mtk_probe_types,
 	                                &ppdata, NULL, 0);
+	if (err) {
+		ranfc_mtd = NULL;
+		kfree(ra);
+	}
 
 	return err;
 }
@@ -2099,8 +2131,9 @@ mtk_nand_remove(struct platform_device *pdev)
 	if (ranfc_mtd) {
 		ra = (struct ra_nand_chip  *)ranfc_mtd->priv;
 
-		/* Deregister partitions */
-		//del_mtd_partitions(ranfc_mtd);
+		if (WARN_ON(mtd_device_unregister(ranfc_mtd)))
+			return;
+		ranfc_mtd = NULL;
 		kfree(ra);
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0)
@@ -2126,6 +2159,8 @@ static struct platform_driver mtk_nand_driver = {
 		.name = "mt7620_nand",
 		.owner = THIS_MODULE,
 		.of_match_table = mtk_nand_match,
+		/* Open MTD devices must keep the controller bound. */
+		.suppress_bind_attrs = true,
 	},
 };
 
