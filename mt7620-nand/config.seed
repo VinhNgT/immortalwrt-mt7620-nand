@@ -5,7 +5,11 @@ CONFIG_TARGET_ramips_mt7620_nand=y
 # Multi-profile with no device selected builds no per-device .bin images during
 # make world, while still building kernels/DTBs for every device in
 # target/linux/ramips/image/mt7620_nand.mk when CONFIG_IB=y.
+# TARGET_PER_DEVICE_ROOTFS activates OpenWrt's DEFAULT_TARGET_* subtarget
+# package defaults (kmod-rt2800-soc, base-files, apk keys) without selecting
+# any device profile.
 CONFIG_TARGET_MULTI_PROFILE=y
+CONFIG_TARGET_PER_DEVICE_ROOTFS=y
 # Build every kernel module (implies CONFIG_ALL_KMODS=y) and every
 # target-specific package (base-files, uboot-envtools, mtd, toolchain libs,
 # etc.) so the ImageBuilder has full local coverage for this exact kernel

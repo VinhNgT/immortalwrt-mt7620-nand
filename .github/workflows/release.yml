@@ -108,16 +108,27 @@ jobs:
           make defconfig
           # defconfig silently drops symbols whose prompt is disabled or whose
           # dependencies are unsatisfied - fail loudly on load-bearing ones
-          grep -q "^CONFIG_TARGET_ramips_mt7620_nand=y" .config
-          grep -q "^CONFIG_TARGET_MULTI_PROFILE=y" .config
-          grep -q "^CONFIG_ALL_NONSHARED=y" .config
-          grep -q "^CONFIG_ALL_KMODS=y" .config
-          grep -q "^CONFIG_IB=y" .config
-          grep -q "^CONFIG_IB_STANDALONE=y" .config
+          for sym in \
+            CONFIG_TARGET_ramips_mt7620_nand=y \
+            CONFIG_TARGET_MULTI_PROFILE=y \
+            CONFIG_TARGET_PER_DEVICE_ROOTFS=y \
+            CONFIG_ALL_NONSHARED=y \
+            CONFIG_ALL_KMODS=y \
+            CONFIG_IB=y \
+            CONFIG_IB_STANDALONE=y \
+            CONFIG_PACKAGE_kmod-rt2800-soc=y; do
+            grep -q "^${sym}$" .config || {
+              echo "ERROR: $sym missing after defconfig" >&2
+              exit 1
+            }
+          done
           # Default subtarget radio and key device/target packages must survive defconfig
-          grep -q "^CONFIG_PACKAGE_kmod-rt2800-soc=y" .config
-          grep -q "^CONFIG_PACKAGE_kmod-mt76x2=[ym]" .config
-          grep -q "^CONFIG_PACKAGE_uboot-envtools=[ym]" .config
+          for p in kmod-mt76x2 uboot-envtools; do
+            grep -qE "^CONFIG_PACKAGE_${p}=[ym]$" .config || {
+              echo "ERROR: CONFIG_PACKAGE_${p} missing after defconfig" >&2
+              exit 1
+            }
+          done
 
       - name: Build host tools
         if: inputs.check_only != true
