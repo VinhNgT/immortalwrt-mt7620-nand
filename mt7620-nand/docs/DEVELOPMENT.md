@@ -62,11 +62,11 @@ other mt7620 device recipes are. How this was learned is in
 
 This is a fork of ImmortalWrt. One branch per upstream release line
 (`git branch -r` lists them); the first, created 2026-09-06, is
-`25.12`, which is the upstream tag `v25.12.1` plus the port. The
+`25.12`, which tracks the upstream tag `v25.12.2` plus the port. The
 series as first assembled, and the shape later commits build on:
 
 ```text
-v25.12.1 (upstream)
+v25.12.2 (upstream)
   ├─ ramips: add mt7620-nand driver for NAND flash              ┐
   ├─ ramips: add mt7620_nand subtarget                          │ the port
   ├─ ramips: add support for Xiaomi Mi Router R3                │ (PORT-NOTES.md)
@@ -79,7 +79,7 @@ v25.12.1 (upstream)
   └─ mt7620-nand: add documentation and replace the README      ┘
 ```
 
-`git log v25.12.1..25.12` shows exactly what the port is; GitHub's
+`git log v25.12.2..25.12` shows exactly what the port is; GitHub's
 compare view between the upstream tag and the branch is the
 reviewable form. There is no patch directory and no installer: the
 tree at any commit *is* the pinned combination of ImmortalWrt code
@@ -138,10 +138,10 @@ The submission is the port commits of the series, re-cut the way a
 reviewer expects, on a scratch branch from the upstream tag:
 
 ```bash
-git checkout -b for-upstream v25.12.1
-git log --reverse --format='%h %s' v25.12.1..25.12 | grep ' ramips: '   # the port commits, in order
+git checkout -b for-upstream v25.12.2
+git log --reverse --format='%h %s' v25.12.2..25.12 | grep ' ramips: '   # the port commits, in order
 git cherry-pick <those hashes>
-git rebase -i v25.12.1     # squash the ECC-report commit into the driver commit, and any
+git rebase -i v25.12.2     # squash the ECC-report commit into the driver commit, and any
                            # later "ramips:" sync commits into the commit that owns their files
 ```
 
@@ -288,7 +288,7 @@ goes.
 ### A new point release on the same line
 
 Expect one every one to three months; the 24.10 line had six between
-April 2025 and April 2026. Example: `v25.12.1` → `v25.12.2`.
+April 2025 and April 2026. Example: `v25.12.2` → `v25.12.3`.
 
 1. Fetch and back up:
 
@@ -296,10 +296,10 @@ April 2025 and April 2026. Example: `v25.12.1` → `v25.12.2`.
    git remote add upstream https://github.com/immortalwrt/immortalwrt.git   # once
    git fetch upstream --tags
    git checkout 25.12
-   git branch backup/25.12-pre-v25.12.2-$(date +%Y%m%d) && git push origin backup/25.12-pre-v25.12.2-$(date +%Y%m%d)
+   git branch backup/25.12-pre-v25.12.3-$(date +%Y%m%d) && git push origin backup/25.12-pre-v25.12.3-$(date +%Y%m%d)
    ```
 
-2. Rebase the series: `git rebase v25.12.2`, resolving conflicts
+2. Rebase the series: `git rebase v25.12.3`, resolving conflicts
    commit by commit and keeping each commit's scope. Conflicts can
    only occur where the port edits upstream files: the uboot-envtools
    board list, `ralink.mk`, ramips' `modules.mk`, the lzma loader's
@@ -329,13 +329,13 @@ April 2025 and April 2026. Example: `v25.12.1` → `v25.12.2`.
      — only the `SUBTARGET`, `BOARDNAME`, `FEATURES` and description
      lines may differ. Port anything else (a changed default package,
      CPU type) into the subtarget's copy.
-   - `git diff v25.12.1 v25.12.2 -- target/linux/ramips/mt7620/base-files`
+   - `git diff v25.12.2 v25.12.3 -- target/linux/ramips/mt7620/base-files`
      — anything added that is **not** a per-board case list (a hotplug
      script, a uci-defaults step, a generic function) applies to every
      MT7620 board and needs a counterpart under
      `target/linux/ramips/mt7620_nand/base-files/`. Per-board entries
      for other boards need nothing.
-   - `grep -rn 'v25\.12\.1' README.md mt7620-nand/docs/DEVELOPMENT.md mt7620-nand/docs/PORT-NOTES.md`
+   - `grep -rn 'v25\.12\.2' README.md mt7620-nand/docs/DEVELOPMENT.md mt7620-nand/docs/PORT-NOTES.md`
      — update the mentions that describe the current state (README's
      status and branch description, the tags in this file's commands,
      PORT-NOTES' kernel/target choice). Historical mentions in
@@ -360,7 +360,7 @@ it is; the new line gets its own branch, named after the line.
 1. `git fetch upstream --tags`, then
    `git checkout -b 26.x v26.x.0`.
 
-2. Bring the series over: `git cherry-pick v25.12.1..25.12`. Resolve
+2. Bring the series over: `git cherry-pick v25.12.2..25.12`. Resolve
    conflicts as in the point-release procedure. Two conflicts are
    specific to a kernel bump and land in the driver and subtarget
    commits:
@@ -387,7 +387,7 @@ it is; the new line gets its own branch, named after the line.
    booted in August 2026; anything newer starts from that.
 
 5. Run the manual checks from the point-release procedure (target.mk,
-   base-files, version mentions — here the whole `v25.12.1` → new-tag
+   base-files, version mentions — here the whole `v25.12.2` → new-tag
    set, plus PROVENANCE.md's patch-path row).
 
 6. Test build, then **RAM-boot before anything else** — a kernel bump

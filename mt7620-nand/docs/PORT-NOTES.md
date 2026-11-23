@@ -85,7 +85,7 @@ controller-independent.
 ## The port — 13 touch points
 
 The port is the commit series on branch `25.12` on top of the
-ImmortalWrt tag `v25.12.1` (see `git log v25.12.1..`). Touch points
+ImmortalWrt tag `v25.12.2` (see `git log v25.12.2..`). Touch points
 1–7 and 9–11 derive from x-wrt commits `387988e8c956` (driver) and
 `f4fc1766f08a` + follow-ups (device), author Chen Minqiang; 8 is the
 subtarget's parity with mt7620, and 12 and 13 are this project's own
@@ -99,6 +99,7 @@ docs use for them:
 | device | `ramips: add support for Xiaomi Mi Router R3` | 4, 5, 9–11 |
 | ECC-report | `ramips: ralink_nand: report corrected bitflips so UBI can scrub` | 12 |
 | IB-feeds | `imagebuilder: list remote userland feeds in standalone apk builds` | 13 |
+| x-wrt sync | `ramips: ralink_nand: sync driver fixes from x-wrt` | 1–2 (driver bugfixes + hybrid ECC) |
 
 The subtarget is the shape the upstream reviewer asked for (below):
 everything device-specific lives in
@@ -194,14 +195,22 @@ x-wrt's other changes to shared ramips files (ramoops in the SoC
 dtsi, its switch drivers and boards) were re-checked on 2026-09-06
 and none is R3-related.
 
-Byte-identical to x-wrt: the driver source and header (before the
-ECC-report commit), the Kconfig hook patch, the DTS, the R3 image
-recipe, both `02_network` cases, and the uboot-envtools entry.
+Byte-identical to x-wrt (as of [PROVENANCE.md](PROVENANCE.md)): the
+driver header, the Kconfig hook patch, the DTS, the R3 image recipe,
+both `02_network` cases, and the uboot-envtools entry; `ralink_nand.c`
+matches x-wrt apart from this project's mainline MTD ECC accounting.
 
 What this project adds or decides on its own, in full:
 
-1. **The ECC-report commit** — this project's fix to the driver
-   (below).
+1. **The ECC-report commit** — this project's mainline MTD ECC
+   accounting in the driver (below). Since `0ea0580cdd` (November 2026),
+   x-wrt itself returns `-EUCLEAN` directly from `nfc_ecc_verify` /
+   `nand_do_read_ops` (which triggers UBI scrubbing and handles
+   multi-page `-EBADMSG` precedence), without setting `ecc_strength`,
+   `bitflip_threshold`, or `ecc_stats.corrected`. This tree takes
+   x-wrt's driver fixes and multi-page `-EBADMSG` handling while
+   retaining `ecc_step_size`/`ecc_strength`/`bitflip_threshold`,
+   `ecc_stats.corrected`, and returning `max_bitflips = 1`.
 2. **The IB-feeds commit** — this project's ImageBuilder change
    (below); nothing to do with x-wrt.
 3. **The `mt7620_nand` subtarget.** x-wrt enables `nand` and the UBI
@@ -327,7 +336,7 @@ Operating rules that follow from the vermagic design:
 
 ## Kernel/target choice
 
-Branch `25.12` pins the ImmortalWrt `v25.12.1` release (kernel 6.12).
+Branch `25.12` pins the ImmortalWrt `v25.12.2` release (kernel 6.12).
 That driver/kernel combination had been compiled by no one before
 August 2026 — x-wrt's mt7620 carries only `config-6.18` — and it was
 built in CI and booted on real hardware that month. The driver was

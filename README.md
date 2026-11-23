@@ -13,14 +13,15 @@ installable packages, and safe upgrades.
 
 This repository is a fork of
 [immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt).
-Branch `25.12` is the ImmortalWrt `v25.12.1` tag plus the port; the
+Branch `25.12` is the ImmortalWrt `v25.12.2` tag plus the port; the
 name refers to the `mt7620_nand` subtarget it adds to the `ramips`
 target.
 
 ## Status
 
 Complete, verified on real hardware (a Mi Router 3 unit, August
-2026, ImmortalWrt `v25.12.1` with kernel 6.12).
+2026, ImmortalWrt `v25.12.1` with kernel 6.12) and rebased onto
+`v25.12.2`.
 
 - Everything works: WiFi (2.4 + 5 GHz), switch, USB, web UI, storage,
   normal sysupgrade.
@@ -31,7 +32,7 @@ Complete, verified on real hardware (a Mi Router 3 unit, August
   the firmware repairs such errors automatically.
 
 The pinned ImmortalWrt version is the branch you are looking at:
-branch `25.12` is the upstream tag `v25.12.1` plus this project's
+branch `25.12` is the upstream tag `v25.12.2` plus this project's
 commits. Each GitHub release names the exact upstream commit it was
 built from.
 
