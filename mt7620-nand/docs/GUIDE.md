@@ -12,8 +12,8 @@ documentation applies to everything not mentioned here.
 
 ## Getting firmware
 
-Firmware comes from this repo's **GitHub releases**. Releases are
-tagged `<immortalwrt-version>-rN` (for example `v25.12.1-r2`): the
+Releases come from this repo's **GitHub releases**. Releases are
+tagged `<immortalwrt-version>-rN` (for example `v25.12.2-r1`): the
 ImmortalWrt version plus a build number. When several releases exist
 for the same ImmortalWrt version, take the newest `-rN` unless its
 notes say otherwise. A release marked **pre-release** was not booted
@@ -21,17 +21,38 @@ on a router before publishing; its notes say why. Prefer the newest
 release that is not a pre-release unless you can recover the device
 yourself.
 
-Each release contains:
+Each GitHub release contains the **ImageBuilder** and build metadata
+rather than pre-built `.bin` images:
 
 | asset | purpose |
+|---|---|
+| `…imagebuilder….tar.zst` | builds custom images for any supported `mt7620_nand` profile and bundles all kernel modules (`kmod-*`) for **this release** |
+| `*.buildinfo` | `config.buildinfo`, `feeds.buildinfo`, and `version.buildinfo` recording exact build inputs |
+| `sha256sums` | checksums — verify your download |
+
+### Generating firmware images from the ImageBuilder
+
+On x86_64 Linux (WSL or Docker works on Windows), verify the checksum,
+unpack the ImageBuilder, and build images for your device (for example
+the Xiaomi Mi Router 3 with LuCI included):
+
+```bash
+sha256sum -c --ignore-missing sha256sums
+tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/
+make info   # lists supported profiles (currently: xiaomi_miwifi-r3)
+make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"
+```
+
+In about a minute, `bin/targets/ramips/mt7620_nand/` contains:
+
+| generated file | purpose |
 |---|---|
 | `…sysupgrade.bin` | normal install/upgrade image — this is the one you flash |
 | `…initramfs-kernel.bin` | test/recovery system that runs entirely from RAM, writes nothing (see [RECOVERY.md](RECOVERY.md)) |
 | `…factory.bin`, `…breed-factory.bin` | only for pb-boot/breed web-recovery uploads — not used with the stock bootloader |
 | `…kernel1.bin`, `…rootfs0.bin` | split images for manual partition writes during recovery |
-| `…imagebuilder….tar.zst` | builds custom images / provides kernel modules for **this release** (below) |
-| `sha256sums` | checksums — verify your download |
-| `….manifest` | full list of packages inside the image |
+| `….manifest` | full list of packages inside the generated image |
+| `sha256sums` | checksums for the generated images |
 
 ## Installing
 
@@ -99,10 +120,9 @@ make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci kmod-batman-adv luci-proto-ba
 ```
 
 A fresh `sysupgrade.bin` appears in `bin/targets/ramips/mt7620_nand/`
-in about a minute — flash it with "Keep settings" checked. The
-ImageBuilder offers exactly one profile, `xiaomi_miwifi-r3` (`make
-info` lists it), because this project builds its own `mt7620-nand`
-subtarget containing only this router.
+in about a minute — flash it with "Keep settings" checked. `make info`
+lists the profiles supported in this `mt7620_nand` subtarget
+(currently `xiaomi_miwifi-r3`).
 
 **B. Install directly, no reflash:** the ImageBuilder's `packages/`
 directory holds every `kmod-*.apk`; copy the one you need (plus any

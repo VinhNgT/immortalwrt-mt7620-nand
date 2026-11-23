@@ -12,21 +12,25 @@ The fork exists for exactly these things; a change that serves none
 of them does not belong here:
 
 1. **mt7620-nand support** as the `mt7620_nand` subtarget of `ramips`
-   — only the Xiaomi Mi Router R3 for now.
+   — currently supporting the Xiaomi Mi Router R3 and structured to add
+   similar MT7620 NAND devices easily later.
 2. **Fix the NAND driver's ECC reporting** so UBI can scrub bitflips.
-3. **A local-only-kmod ImageBuilder**: every kernel module built and
-   bundled with each release, userland packages from the official
-   feeds.
-4. **A CI release workflow**: a tag push builds and publishes a
-   release; a manual run is a test build.
+3. **A local-only-kmod standalone ImageBuilder as the main output**:
+   every kernel module and target-specific package built and bundled
+   with each release (`CONFIG_ALL_NONSHARED=y`, `CONFIG_IB=y`,
+   `CONFIG_IB_STANDALONE=y`), with userland packages (including LuCI)
+   resolved from ImmortalWrt's official `mipsel_24kc` feeds when
+   assembling images.
+4. **A CI release workflow**: a tag push builds, smoke-tests, and
+   publishes the ImageBuilder release; a manual dispatch runs either a
+   fast pre-flight check or a full test build.
 5. **Documentation**: research notes, user guides and this project's
    own README, kept under `mt7620-nand/`.
 6. **A local containerized build** for a Windows host
    (`mt7620-nand/build.ps1`).
 7. **Tracking x-wrt as the driver's source**: provenance by content
    hash and a drift check.
-8. **LuCI in the images**, as in ImmortalWrt's official releases.
-9. **Device-private data kept out of the repository**
+8. **Device-private data kept out of the repository**
    (`mt7620-nand/PRIVATE-NOTES.md` is git-ignored).
 
 Two rules follow from this being a fork of ImmortalWrt, not of x-wrt:
@@ -92,7 +96,7 @@ elsewhere:
 
 | | |
 |---|---|
-| `mt7620-nand/config.seed` | build seed (target + device + LuCI + kmod/IB/ccache options, each explained inline) |
+| `mt7620-nand/config.seed` | subtarget ImageBuilder seed (`mt7620_nand` + multi-profile + `ALL_NONSHARED` + standalone `IB`, each explained inline) |
 | `mt7620-nand/scripts/tag-release.sh` | cuts a release: computes the next `<upstream>-rN`, tags HEAD, pushes |
 | `mt7620-nand/scripts/check-xwrt-drift.sh` | reports whether x-wrt master's versions of the four whole files taken from it changed; `--hunks` prints x-wrt's R3 lines from its shared files |
 | `mt7620-nand/scripts/sync-subtarget-config.sh`, `mt7620-nand/subtarget-kconfig.fragment` | regenerates (or, with `--check`, verifies) the mt7620_nand kernel config as mt7620's config plus the fragment, lists any dependency gate on the mt7620 subtarget name that lacks `mt7620_nand`, and reports composed gates (`BUILD_SUBTARGET`) for a judgment by hand |
@@ -170,28 +174,39 @@ cp mt7620-nand/config.seed .config && make defconfig
 make -j"$(nproc)" download && make -j"$(nproc)"
 ```
 
-Images land in `bin/targets/ramips/mt7620_nand/`.
+The output lands in `bin/targets/ramips/mt7620_nand/` (including
+`immortalwrt-imagebuilder-*.tar.zst` and `*.buildinfo`).
 
 **Docker** (Windows host): `.\mt7620-nand\build.ps1` — builds the
 `iwrt-builder` image, fetches the *current local commit* of this
 checkout into a named volume (`iwrt-src`, so re-runs are fast), and
-drops images in `mt7620-nand\out\`. Add `-Shell` for an interactive
-shell in the build container instead. The build runs inside the
-volume, never on the Windows bind mount (OpenWrt cannot build on a
-case-insensitive filesystem). It applies the same post-defconfig
-guards as CI.
+drops the ImageBuilder, `*.buildinfo`, and `sha256sums` into
+`mt7620-nand\out\`. Add `-Shell` for an interactive shell in the build
+container instead. The build runs inside the volume, never on the
+Windows bind mount (OpenWrt cannot build on a case-insensitive
+filesystem). It applies the same post-defconfig guards as CI.
 
 ## Test builds in CI
 
 Dispatch the release workflow manually ("Run workflow" on the Actions
-page), picking the branch or commit to build — there are no other
-inputs. It runs the full pipeline and uploads the images as workflow
-**artifacts**, publishing nothing. Use this to shake out a change
-before cutting a release. Each run's summary shows the kernel package
-version; it changes only when kernel-side inputs change, so it is a
-quick check that a change did what it was meant to. The artifact's
-`.manifest` lists every package in the image; `kmod-rt2800-soc` and
-`kmod-mt76x2` must be in it.
+page), picking the branch or commit to build and two boolean inputs:
+
+- **`check_only`** (default `false`): stops right after `Install feeds`,
+  `sync-subtarget-config.sh --check`, and `Configure` defconfig guards
+  (~2–3 minutes). Use this to catch rebase or config drift immediately.
+- **`prebuilt_toolchain`** (default `true`): hydrates
+  `staging_dir/toolchain-*` from ImmortalWrt's official
+  `immortalwrt-toolchain-<ver>-ramips-mt7620_*.tar.zst` instead of
+  compiling GCC/binutils/musl from scratch. Set to `false` to test a
+  full source toolchain build.
+
+A full manual run builds `world`, smoke-tests the generated ImageBuilder
+(`make info` and `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`),
+and uploads `immortalwrt-imagebuilder-*.tar.*`, `*.buildinfo`, and
+`sha256sums` as workflow **artifacts**, publishing nothing. Each run's
+summary shows the kernel package version; it changes only when
+kernel-side inputs change, so it is a quick check that a change did
+what it was meant to.
 
 ## Cutting a release
 
@@ -200,9 +215,27 @@ sh mt7620-nand/scripts/tag-release.sh
 ```
 
 Add `-p "<reason>"` to publish a **pre-release** (for example a build
-that could not be RAM-booted first): the reason is stored in the tag
+that has not been RAM-booted yet): the reason is stored in the tag
 annotation and the workflow marks the GitHub release as a pre-release
 with a warning on top of its notes.
+
+Because CI builds take ~1h+ and releases only happen every few months,
+routine releases follow a **build-once** flow:
+
+1. Run a fast `check_only=true` dispatch (or verify locally) to catch
+   subtarget/defconfig drift in ~2 minutes.
+2. Tag with `-p "Pending hardware RAM-boot verification"` and push. CI
+   builds once, smoke-tests the ImageBuilder, and publishes the
+   pre-release (`immortalwrt-imagebuilder-*.tar.zst`, `*.buildinfo`,
+   `sha256sums`).
+3. Download the released ImageBuilder, generate the `initramfs` image
+   (`make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`), and
+   RAM-boot it on the router ([RECOVERY.md](RECOVERY.md)).
+4. Once hardware-verified, promote the release in place without
+   rebuilding (`gh release edit <tag> --prerelease=false` and remove the
+   pre-release warning banner from its notes). Assets and kernel
+   vermagic stay untouched. Only cut a new `-rN` tag if hardware testing
+   finds a bug that requires a code change.
 
 The script derives the upstream version from the nearest upstream
 tag below HEAD (`git describe`), refuses a dirty tree or a HEAD that
@@ -210,21 +243,24 @@ is not on an `origin` branch, computes the next free
 `<version>-rN` from origin's tags (max + 1, so deleted releases never
 cause number reuse), tags HEAD, and pushes the tag. The tag push
 triggers `.github/workflows/release.yml`, which checks that the tag's
-version prefix matches the tree's upstream base, builds, and publishes
-the GitHub release: all image formats, the manifest, `sha256sums`, and
-the build's ImageBuilder, with notes recording the upstream base, the
-port commit, the x-wrt provenance, and the kernel package version.
+version prefix matches the tree's upstream base, builds, smoke-tests the
+ImageBuilder, and publishes the GitHub release with notes recording the
+upstream base, the port commit, the x-wrt provenance, and the kernel
+package version.
 
 Rules:
 
-- **Releases are immutable.** Every build has a unique kernel
+- **Releases are immutable in assets.** Every build has a unique kernel
   vermagic, so a release's ImageBuilder must stay downloadable
-  unchanged for as long as anyone runs that release's image. Never
-  edit a published release's assets; any rebuild is the next `-rN`.
-- **Release only what was RAM-booted.** Before tagging, RAM-boot the
-  initramfs from the test build of the same commit
-  ([RECOVERY.md](RECOVERY.md)) and note it in the release. If that is
-  not possible, tag with `-p` so the release is clearly marked.
+  unchanged for as long as anyone runs firmware built from it. Never
+  replace or edit a published release's asset files; only toggling the
+  GitHub pre-release flag/notes on verification is allowed. Any rebuild
+  is the next `-rN`.
+- **Verify by RAM-boot before promoting out of pre-release.** Generate
+  the initramfs image from the released ImageBuilder and RAM-boot it
+  first ([RECOVERY.md](RECOVERY.md)). Only promote the release (or tag
+  without `-p` when testing from a test-build artifact first) after
+  RAM-boot passes.
 - **Tags keep commits alive.** The branch is rebased when upstream
   moves (below), which orphans old commits; a release tag is what
   keeps a released tree fetchable forever. Never build a release from
@@ -240,27 +276,39 @@ The authoritative documentation is the comments in
 
 - **Checkout** is blobless with full history, so `git describe` can
   find the upstream base tag without downloading every blob.
-- **Caches**: `dl/` (keyed on the upstream base; release tarballs are
-  frozen), toolchain + host trees (keyed on the toolchain sources and
-  `config.seed` — build options enter every package's configure
-  fingerprint, so restored trees must match the config or make
-  re-configures on dirty state and fails), the feeds checkout (feed
-  commits are pinned per release), and ccache (saved even on failure
-  so retries are cheap). **Any textual change to `config.seed`
-  invalidates the toolchain cache** — one ~40 min rebuild, then
-  cached again.
+- **No CI caches**: because releases happen only once every few months,
+  GitHub's 7-day `actions/cache` eviction makes `dl/`/`toolchain/`/
+  `ccache` caches cold on release day. Dropping them removes archive and
+  ccache overhead and guarantees reproducible clean-room builds.
 - **Subtarget check**: right after the feeds are installed,
   `sync-subtarget-config.sh --check` verifies the mt7620_nand kernel
   config and scans the tree and the feeds for dependency gates that
-  name mt7620 without `mt7620_nand`. It runs before the toolchain so
+  name mt7620 without `mt7620_nand`. It runs before host tools so
   a drift fails in minutes. Composed gates are printed as a note in
   the same step, not failed (the table below says who judges them).
 - **Guards**: after `make defconfig`, the workflow greps the expanded
-  `.config` for the device profile, `CCACHE`, `ALL_KMODS`, `IB`, and
-  both radio kmods — defconfig silently drops symbols whose Kconfig
-  prompt is hidden and default packages whose dependencies are
-  unsatisfied, and a silent drop should fail the run in minute two,
-  not waste a quiet hour or ship an image without WiFi.
+  `.config` for `TARGET_ramips_mt7620_nand`, `TARGET_MULTI_PROFILE`,
+  `ALL_NONSHARED`, `ALL_KMODS`, `IB`, `IB_STANDALONE`,
+  `kmod-rt2800-soc`, `kmod-mt76x2`, and `uboot-envtools` — defconfig
+  silently drops symbols whose Kconfig prompt is hidden or disabled and
+  packages whose dependencies are unsatisfied, and a silent drop should
+  fail the run in minute two.
+- **Host tools + Prebuilt toolchain hydration**: `make tools/install`
+  builds host tools cleanly, then `Hydrate prebuilt toolchain` downloads
+  ImmortalWrt's official SHA-256-verified
+  `immortalwrt-toolchain-<ver>-ramips-mt7620_*.tar.zst` tarball (same
+  `mipsel_24kc` musl ABI/GCC), places it into `staging_dir/toolchain-*`,
+  unwraps `target/toolchain/Makefile`'s `*.bin` wrappers, runs
+  `scripts/patch-specs.sh`, verifies `mipsel-openwrt-linux-musl-gcc
+  --version`, and touches the toolchain stamps. This keeps `config.seed`
+  100% stock OpenWrt (no `EXTERNAL_TOOLCHAIN` patches) while skipping ~35
+  minutes of compiling GCC/binutils/musl. Setting `prebuilt_toolchain`
+  to `false` falls back to `make toolchain/install`.
+- **ImageBuilder smoke test**: after `make world`, CI unpacks the
+  generated ImageBuilder, verifies `xiaomi_miwifi-r3` appears in
+  `make info`, runs `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`,
+  and checks that `kmod-rt2800-soc`, `kmod-mt76x2`, and `luci` land in
+  the resulting `.manifest` before discarding the test image.
 - **Failure diagnostics**: `CONFIG_BUILD_LOG=y` writes per-package
   logs, uploaded as a `build-logs` artifact when a run fails.
 
@@ -271,7 +319,7 @@ The authoritative documentation is the comments in
 | mt7620_nand kernel config vs mt7620's plus the fragment | `sync-subtarget-config.sh` | every CI build; by hand after a rebase |
 | dependency gates on the mt7620 subtarget name | `sync-subtarget-config.sh` | same |
 | composed gates (`BUILD_SUBTARGET`) being device-bound | you, from the script's note | after every rebase |
-| default packages surviving defconfig (profile, both radios) | `release.yml`, `build-inside.sh` | every build |
+| default symbols/packages surviving defconfig (`TARGET_MULTI_PROFILE`, `ALL_NONSHARED`, `IB`, radios, `uboot-envtools`) | `release.yml`, `build-inside.sh` | every build |
 | the four whole files taken from x-wrt | `check-xwrt-drift.sh` | by hand, per the x-wrt procedure |
 | x-wrt's R3 hunks in its shared files | you, with `check-xwrt-drift.sh --hunks` | same |
 | mt7620's target.mk | you, one diff | after every rebase |
@@ -342,13 +390,15 @@ April 2025 and April 2026. Example: `v25.12.2` → `v25.12.3`.
      PORT-NOTES' kernel/target choice). Historical mentions in
      RESEARCH-LOG.md stay.
 
-5. Push a test build, check its Configure step passed the guards and
-   its manifest has both radios, then RAM-boot the initramfs
-   ([RECOVERY.md](RECOVERY.md)).
-
-6. `git push --force-with-lease origin 25.12`, then cut the release
-   with `tag-release.sh`. Delete the backup branch once the release is
-   out.
+5. Push the rebased branch (`git push --force-with-lease origin 25.12`)
+   and run a quick `check_only=true` workflow dispatch (~2m) to verify
+   feeds, subtarget checks, and `defconfig` guards.
+6. Cut a pre-release with `tag-release.sh -p "..."`, generate an
+   initramfs from the released ImageBuilder (`make image
+   PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`), RAM-boot it
+   ([RECOVERY.md](RECOVERY.md)), then promote the GitHub release out of
+   pre-release (`gh release edit <tag> --prerelease=false`) and delete
+   the backup branch once verified.
 
 Keep project-file changes (anything under `mt7620-nand/`) in their
 own commits, separate from port changes, as the series already does.

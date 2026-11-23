@@ -296,8 +296,9 @@ Because this port's kernel is self-built, its **vermagic** (the hash
 kernel modules are matched against) can never equal the official
 release's — official-feed kmods are permanently uninstallable, and
 Linux without `CONFIG_MODULE_FORCE_LOAD` offers no override. The
-repo's answer is `CONFIG_ALL_KMODS=y` (build **every** kmod with each
-firmware) plus `CONFIG_IB=y` (every release ships an ImageBuilder
+repo's answer is `CONFIG_ALL_NONSHARED=y` (which implies
+`CONFIG_ALL_KMODS=y`, building **every** kmod and target-specific
+package) plus `CONFIG_IB=y` (every release ships an ImageBuilder
 that bundles them all).
 
 ImmortalWrt builds that ImageBuilder standalone
