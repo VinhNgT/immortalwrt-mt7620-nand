@@ -20,6 +20,11 @@ CONFIG_ALL_NONSHARED=y
 # target/imagebuilder/Makefile patch.
 CONFIG_IB=y
 CONFIG_IB_STANDALONE=y
+# IMAGEOPT and VERSIONOPT unlock VERSION_FILENAMES so IB_NAME (and images
+# built by the ImageBuilder) includes VERSION_NUMBER from include/version.mk
+CONFIG_IMAGEOPT=y
+CONFIG_VERSIONOPT=y
+CONFIG_VERSION_FILENAMES=y
 # Per-package build logs under logs/ — CI uploads them when a build fails
 CONFIG_DEVEL=y
 CONFIG_BUILD_LOG=y

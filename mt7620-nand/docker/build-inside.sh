@@ -37,18 +37,17 @@ for sym in \
 	CONFIG_ALL_KMODS=y \
 	CONFIG_IB=y \
 	CONFIG_IB_STANDALONE=y \
+	CONFIG_VERSION_FILENAMES=y \
 	CONFIG_PACKAGE_kmod-rt2800-soc=y; do
 	grep -q "^${sym}$" .config || {
 		echo "ERROR: $sym missing after defconfig"
 		exit 1
 	}
 done
-for p in kmod-mt76x2 uboot-envtools; do
-	grep -qE "^CONFIG_PACKAGE_${p}=[ym]$" .config || {
-		echo "ERROR: $p missing after defconfig"
-		exit 1
-	}
-done
+grep -qE "^CONFIG_PACKAGE_uboot-envtools=[ym]$" .config || {
+	echo "ERROR: CONFIG_PACKAGE_uboot-envtools missing after defconfig"
+	exit 1
+}
 
 make -j"$(nproc)" download
 make -j"$(nproc)" world

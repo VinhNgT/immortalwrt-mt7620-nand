@@ -1,4 +1,4 @@
-# ImmortalWrt for `ramips/mt7620_nand` (Xiaomi Mi Router 3)
+# ImmortalWrt for `ramips/mt7620_nand`
 
 > [!WARNING]
 > This project is vibe coded with Anthropic Claude Fable 5 — use at your own risk.
@@ -61,11 +61,12 @@ Linux (or WSL / Docker on Windows):
 1. Download `immortalwrt-imagebuilder-….tar.zst` and `sha256sums` from
    the newest [GitHub release](../../releases) and verify the checksum
    (`sha256sum -c --ignore-missing sha256sums`).
-2. Unpack and build your device images (for Mi Router 3 with LuCI):
+2. Unpack, list the supported profiles, and build your device images (for example with LuCI):
 
    ```bash
    tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/
-   make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"
+   make info
+   make image PROFILE=<profile> PACKAGES="luci"
    ```
 
    Images (`…sysupgrade.bin`, `…initramfs-kernel.bin`, recovery

@@ -145,19 +145,18 @@ jobs:
             CONFIG_ALL_KMODS=y \
             CONFIG_IB=y \
             CONFIG_IB_STANDALONE=y \
+            CONFIG_VERSION_FILENAMES=y \
             CONFIG_PACKAGE_kmod-rt2800-soc=y; do
             grep -q "^${sym}$" .config || {
               echo "ERROR: $sym missing after defconfig" >&2
               exit 1
             }
           done
-          # Default subtarget radio and key device/target packages must survive defconfig
-          for p in kmod-mt76x2 uboot-envtools; do
-            grep -qE "^CONFIG_PACKAGE_${p}=[ym]$" .config || {
-              echo "ERROR: CONFIG_PACKAGE_${p} missing after defconfig" >&2
-              exit 1
-            }
-          done
+          # Key target-specific nonshared package must survive defconfig
+          grep -qE "^CONFIG_PACKAGE_uboot-envtools=[ym]$" .config || {
+            echo "ERROR: CONFIG_PACKAGE_uboot-envtools missing after defconfig" >&2
+            exit 1
+          }
           if [ "$EXPECT_PREBUILT_LLVM" = "true" ]; then
             grep -q "^CONFIG_USE_LLVM_PREBUILT=y$" .config || {
               echo "ERROR: CONFIG_USE_LLVM_PREBUILT=y missing after defconfig" >&2
@@ -250,18 +249,27 @@ jobs:
         if: inputs.check_only != true
         run: |
           set -euo pipefail
-          ib=$(ls bin/targets/ramips/mt7620_nand/immortalwrt-imagebuilder-*.tar.*)
+          BASE_VER="${BASE_REF#v}"
+          ib=$(ls bin/targets/ramips/mt7620_nand/immortalwrt-imagebuilder-"${BASE_VER}"-ramips-mt7620_nand.*.tar.*)
           tmp_ib=$(mktemp -d)
           trap 'rm -rf "$tmp_ib"' EXIT
           tar -xf "$ib" -C "$tmp_ib"
           ib_dir=$(find "$tmp_ib" -mindepth 1 -maxdepth 1 -type d | head -n1)
           make -C "$ib_dir" info | tee "$tmp_ib/info.txt"
-          grep -q '^xiaomi_miwifi-r3:' "$tmp_ib/info.txt"
-          make -C "$ib_dir" image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"
-          manifest=$(ls "$ib_dir"/bin/targets/ramips/mt7620_nand/*miwifi-r3*.manifest)
-          grep -q '^kmod-rt2800-soc ' "$manifest"
-          grep -q '^kmod-mt76x2 ' "$manifest"
-          grep -q '^luci ' "$manifest"
+          profiles=$(awk '
+            /^Available Profiles:$/ { in_profiles=1; next }
+            in_profiles && /^[^[:space:]].*:$/ { sub(/:$/, ""); print }
+          ' "$tmp_ib/info.txt")
+          [ -n "$profiles" ] || { echo "ERROR: no profiles found in make info" >&2; exit 1; }
+          for profile in $profiles; do
+            make -C "$ib_dir" image PROFILE="$profile" PACKAGES="luci"
+            prefix="$ib_dir/bin/targets/ramips/mt7620_nand/immortalwrt-${BASE_VER}-ramips-mt7620_nand-${profile,,}"
+            manifest="${prefix}.manifest"
+            [ -f "$manifest" ] || { echo "ERROR: expected $manifest" >&2; exit 1; }
+            ls "${prefix}"-*.bin >/dev/null
+            grep -q '^kmod-rt2800-soc ' "$manifest"
+            grep -q '^luci ' "$manifest"
+          done
 
       # CONFIG_BUILD_LOG=y writes per-package logs; without this a quiet
       # "-C toolchain/binutils ... failed to build" is undiagnosable.
@@ -339,11 +347,12 @@ jobs:
             echo
             echo "### Generating firmware images"
             echo
-            echo "Unpack the ImageBuilder on x86_64 Linux (or WSL/Docker) and build images for your device (e.g. Mi Router 3 with LuCI):"
+            echo "Unpack the ImageBuilder on x86_64 Linux (or WSL/Docker) and build images for your device (e.g. with LuCI):"
             echo
             echo '```bash'
             echo 'tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/'
-            echo 'make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"'
+            echo 'make info'
+            echo 'make image PROFILE=<profile> PACKAGES="luci"'
             echo '```'
             echo
             echo "**Kernel modules are tied to this exact build** (vermagic): install"

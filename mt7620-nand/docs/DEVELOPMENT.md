@@ -202,7 +202,8 @@ page), picking the branch or commit to build and two boolean inputs:
   test full source builds of both toolchains.
 
 A full manual run builds `world`, smoke-tests the generated ImageBuilder
-(`make info` and `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`),
+(`make info` and `make image PROFILE=<profile> PACKAGES="luci"` for each
+profile in the subtarget),
 and uploads `immortalwrt-imagebuilder-*.tar.*`, `*.buildinfo`, and
 `sha256sums` as workflow **artifacts**, publishing nothing. Each run's
 summary shows the kernel package version; it changes only when
@@ -230,7 +231,7 @@ routine releases follow a **build-once** flow:
    pre-release (`immortalwrt-imagebuilder-*.tar.zst`, `*.buildinfo`,
    `sha256sums`).
 3. Download the released ImageBuilder, generate the `initramfs` image
-   (`make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`), and
+   (`make image PROFILE=<profile> PACKAGES="luci"`), and
    RAM-boot it on the router ([RECOVERY.md](RECOVERY.md)).
 4. Once hardware-verified, promote the release in place without
    rebuilding (`gh release edit <tag> --prerelease=false` and remove the
@@ -289,8 +290,9 @@ The authoritative documentation is the comments in
   the same step, not failed (the table below says who judges them).
 - **Guards**: after `make defconfig`, the workflow greps the expanded
   `.config` for `TARGET_ramips_mt7620_nand`, `TARGET_MULTI_PROFILE`,
-  `ALL_NONSHARED`, `ALL_KMODS`, `IB`, `IB_STANDALONE`,
-  `kmod-rt2800-soc`, `kmod-mt76x2`, and `uboot-envtools` — defconfig
+  `TARGET_PER_DEVICE_ROOTFS`, `ALL_NONSHARED`, `ALL_KMODS`, `IB`,
+  `IB_STANDALONE`, `VERSION_FILENAMES`, `kmod-rt2800-soc`, and
+  `uboot-envtools` — defconfig
   silently drops symbols whose Kconfig prompt is hidden or disabled and
   packages whose dependencies are unsatisfied, and a silent drop should
   fail the run in minute two.
@@ -314,10 +316,11 @@ The authoritative documentation is the comments in
   `false` falls back to building both `llvm-bpf` and `toolchain/install`
   from source.
 - **ImageBuilder smoke test**: after `make world`, CI unpacks the
-  generated ImageBuilder, verifies `xiaomi_miwifi-r3` appears in
-  `make info`, runs `make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`,
-  and checks that `kmod-rt2800-soc`, `kmod-mt76x2`, and `luci` land in
-  the resulting `.manifest` before discarding the test image.
+  versioned ImageBuilder archive, discovers every profile listed by
+  `make info`, runs `make image PROFILE="$profile" PACKAGES="luci"` for
+  each one, verifies the versioned `.bin` images and `.manifest`, and
+  checks that `kmod-rt2800-soc` and `luci` land in the manifest before
+  discarding the test image.
 - **Failure diagnostics**: `CONFIG_BUILD_LOG=y` writes per-package
   logs, uploaded as a `build-logs` artifact when a run fails.
 
@@ -328,7 +331,7 @@ The authoritative documentation is the comments in
 | mt7620_nand kernel config vs mt7620's plus the fragment | `sync-subtarget-config.sh` | every CI build; by hand after a rebase |
 | dependency gates on the mt7620 subtarget name | `sync-subtarget-config.sh` | same |
 | composed gates (`BUILD_SUBTARGET`) being device-bound | you, from the script's note | after every rebase |
-| default symbols/packages surviving defconfig (`TARGET_MULTI_PROFILE`, `ALL_NONSHARED`, `IB`, radios, `uboot-envtools`) | `release.yml`, `build-inside.sh` | every build |
+| default symbols/packages surviving defconfig (`TARGET_MULTI_PROFILE`, `ALL_NONSHARED`, `IB`, `VERSION_FILENAMES`, `kmod-rt2800-soc`, `uboot-envtools`) | `release.yml`, `build-inside.sh` | every build |
 | the four whole files taken from x-wrt | `check-xwrt-drift.sh` | by hand, per the x-wrt procedure |
 | x-wrt's R3 hunks in its shared files | you, with `check-xwrt-drift.sh --hunks` | same |
 | mt7620's target.mk | you, one diff | after every rebase |
@@ -404,7 +407,7 @@ April 2025 and April 2026. Example: `v25.12.2` → `v25.12.3`.
    feeds, subtarget checks, and `defconfig` guards.
 6. Cut a pre-release with `tag-release.sh -p "..."`, generate an
    initramfs from the released ImageBuilder (`make image
-   PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"`), RAM-boot it
+   PROFILE=<profile> PACKAGES="luci"`), RAM-boot it
    ([RECOVERY.md](RECOVERY.md)), then promote the GitHub release out of
    pre-release (`gh release edit <tag> --prerelease=false`) and delete
    the backup branch once verified.

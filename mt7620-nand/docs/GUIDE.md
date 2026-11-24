@@ -1,6 +1,6 @@
 # User guide
 
-Running ImmortalWrt on the Xiaomi Mi Router 3: getting firmware,
+Running ImmortalWrt on `ramips/mt7620_nand` devices: getting firmware,
 installing, upgrading, adding packages, and the quirks worth knowing.
 Before your first ever flash — and whenever something goes wrong —
 read [RECOVERY.md](RECOVERY.md).
@@ -34,13 +34,13 @@ rather than pre-built `.bin` images:
 
 On x86_64 Linux (WSL or Docker works on Windows), verify the checksum,
 unpack the ImageBuilder, and build images for your device (for example
-the Xiaomi Mi Router 3 with LuCI included):
+with LuCI included):
 
 ```bash
 sha256sum -c --ignore-missing sha256sums
 tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/
-make info   # lists supported profiles (currently: xiaomi_miwifi-r3)
-make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci"
+make info   # lists supported profiles
+make image PROFILE=<profile> PACKAGES="luci"
 ```
 
 In about a minute, `bin/targets/ramips/mt7620_nand/` contains:
@@ -113,16 +113,16 @@ survives upgrades of the package list):
 
 ```bash
 tar xf immortalwrt-imagebuilder-*.tar.zst && cd immortalwrt-imagebuilder-*/
+make info
 ```
 
 ```bash
-make image PROFILE=xiaomi_miwifi-r3 PACKAGES="luci kmod-batman-adv luci-proto-batman-adv batctl-default"
+make image PROFILE=<profile> PACKAGES="luci kmod-batman-adv luci-proto-batman-adv batctl-default"
 ```
 
 A fresh `sysupgrade.bin` appears in `bin/targets/ramips/mt7620_nand/`
 in about a minute — flash it with "Keep settings" checked. `make info`
-lists the profiles supported in this `mt7620_nand` subtarget
-(currently `xiaomi_miwifi-r3`).
+lists the profiles supported in this `mt7620_nand` subtarget.
 
 **B. Install directly, no reflash:** the ImageBuilder's `packages/`
 directory holds every `kmod-*.apk`; copy the one you need (plus any
