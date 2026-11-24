@@ -107,7 +107,7 @@ jobs:
       # CONFIG_BPF_TOOLCHAIN_PREBUILT option and skips ~55m of compiling LLVM
       # from source for qosify.
       - name: Hydrate prebuilt LLVM-BPF toolchain
-        if: inputs.check_only != true && inputs.prebuilt_toolchain != false
+        if: inputs.check_only != true && (github.event_name != 'workflow_dispatch' || inputs.prebuilt_toolchain)
         run: |
           set -euo pipefail
           BASE_VER="${BASE_REF#v}"
@@ -131,7 +131,7 @@ jobs:
 
       - name: Configure
         env:
-          EXPECT_PREBUILT_LLVM: ${{ inputs.check_only != true && inputs.prebuilt_toolchain != false }}
+          EXPECT_PREBUILT_LLVM: ${{ inputs.check_only != true && (github.event_name != 'workflow_dispatch' || inputs.prebuilt_toolchain) }}
         run: |
           cp mt7620-nand/config.seed .config
           make defconfig
@@ -177,7 +177,7 @@ jobs:
       # staging_dir/toolchain-* skips ~35m of compiling GCC/binutils/musl while
       # keeping config.seed 100% stock OpenWrt.
       - name: Hydrate prebuilt toolchain
-        if: inputs.check_only != true && inputs.prebuilt_toolchain != false
+        if: inputs.check_only != true && (github.event_name != 'workflow_dispatch' || inputs.prebuilt_toolchain)
         run: |
           set -euo pipefail
           BASE_VER="${BASE_REF#v}"
@@ -229,7 +229,7 @@ jobs:
           touch "$TOOLCHAIN_DIR/stamp/.toolchain_compile"
 
       - name: Build toolchain from source
-        if: inputs.check_only != true && inputs.prebuilt_toolchain == false
+        if: inputs.check_only != true && github.event_name == 'workflow_dispatch' && !inputs.prebuilt_toolchain
         run: make -j"$(nproc)" toolchain/install
 
       - name: Download sources
@@ -306,7 +306,7 @@ jobs:
             echo "| upstream base | \`$BASE_REF\` (\`$BASE_SHA\`) |"
             echo "| port commit | \`$GITHUB_SHA\` |"
             echo "| kernel package | \`$kernel\` |"
-            echo "| prebuilt toolchain | \`${{ inputs.prebuilt_toolchain != false }}\` |"
+            echo "| prebuilt toolchain | \`${{ github.event_name != 'workflow_dispatch' || inputs.prebuilt_toolchain }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Test builds (workflow_dispatch) get artifacts instead of a release.
